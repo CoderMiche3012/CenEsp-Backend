@@ -1,0 +1,7 @@
+Para guardar las librerias utilizadas en el entorno VENV
+
+pip freeze > requirements.txt
+
+Para cargar las librerias en colaborativo
+
+pip install -r requirements.txt
