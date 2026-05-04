@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-
+from periodos.models import Periodo
 
 class Direccion(models.Model):
     id_direccion = models.AutoField(primary_key=True)
@@ -17,7 +17,7 @@ class Direccion(models.Model):
     def __str__(self):
         return f"{self.calle} {self.numero}, {self.colonia}"
 
-#no manda los demas campos 
+ 
 class Expediente(models.Model):
     id_expediente = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=20)
@@ -77,7 +77,7 @@ class Visita_Postulante(models.Model):
     estado_visita = models.CharField(max_length=50, default='Programada')
     nota_visita = models.TextField(null=True, blank=True)
     
-    # Relación con el Postulante
+    
     id_postulante = models.ForeignKey(
         Postulante, 
         on_delete=models.CASCADE, 
@@ -94,7 +94,7 @@ class Visita_Postulante(models.Model):
     
 class Beneficiario(models.Model):
     id_beneficiario = models.AutoField(primary_key=True)
-    estatus = models.CharField(max_length=20, default='Activo')
+    #estatus = models.CharField(max_length=20, default='Activo')
     notas = models.TextField(null=True, blank=True)
     fecha_ingreso = models.DateField(auto_now_add=True)
     
@@ -117,9 +117,8 @@ class Fotografias(models.Model):
     link = models.URLField(max_length=500) 
     descripcion = models.CharField(max_length=255, blank=True, null=True)
     fecha_carga = models.DateField(auto_now_add=True)
-    etapa = models.CharField(max_length=50) # Ej. Visita Domiciliaria, Seguimiento
+    etapa = models.CharField(max_length=50) 
 
-    # Conexión 1 a MUCHOS con el expediente principal
     id_expediente = models.ForeignKey(
         Expediente, 
         on_delete=models.CASCADE, 
@@ -129,3 +128,31 @@ class Fotografias(models.Model):
 
     class Meta:
         db_table = 'fotografias'
+
+
+class SeguimientoBeneficiario(models.Model):
+    id_seguimiento = models.AutoField(primary_key=True)
+    nota_seguimiento = models.TextField()
+    estatus = models.CharField(max_length=20, default='Activo')
+    # fk a beneficiario
+    id_beneficiario = models.ForeignKey(
+        'Beneficiario', 
+        on_delete=models.CASCADE, 
+        related_name='seguimientos',
+        db_column='id_beneficiario'
+    )
+    
+    # fk a periodo
+    id_periodo = models.ForeignKey(
+        Periodo, 
+        on_delete=models.PROTECT, 
+        related_name='seguimientos_periodo',
+        db_column='id_periodo'
+    )
+
+    class Meta:
+        db_table = 'seguimiento_beneficiario'
+        verbose_name_plural = 'Seguimientos de Beneficiarios'
+
+    def __str__(self):
+        return f"Seguimiento {self.id_seguimiento} - {self.id_beneficiario.id_expediente.nombre}"

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'beneficiarios',# manejo de modulo de informacion de beneficiarios 
     'estudios',
     'donadores',
+    'escolaridad',
 ]
 
 MIDDLEWARE = [

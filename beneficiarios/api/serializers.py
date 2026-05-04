@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from django.core.validators import RegexValidator
-from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias
+from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario
 from estudios.models import Familia
 from estudios.api.serializers import FamiliaSerializer
+from escolaridad.api.serializers import DatosEscolaresSerializer
 
 letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', message='Solo letras y espacios.')
 telefono_regex = RegexValidator(regex=r'^\d{10}$', message='Exactamente 10 dígitos.')
@@ -105,8 +106,25 @@ class VisitaPostulanteSerializer(serializers.ModelSerializer):
         model = Visita_Postulante
         fields = '__all__'
 
+
+# mandare todo el paquete de datos en un solo json anidado para el seguimiento del beneficairio
+class SeguimientoBeneficiarioSerializer(serializers.ModelSerializer):
+    # Traemos los datos escolares (y sus boletas anidadas)
+    datos_escolares = DatosEscolaresSerializer(read_only=True)
+
+    class Meta:
+        model = SeguimientoBeneficiario
+        fields = '__all__'
+
+
 class BeneficiarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Beneficiario
         fields = '__all__'
-
+        
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+        # Extraemos todos los seguimientos vinculados a este beneficiario
+        historial = instance.seguimientos.all() 
+        response['historial_seguimientos'] = SeguimientoBeneficiarioSerializer(historial, many=True).data
+        return response
