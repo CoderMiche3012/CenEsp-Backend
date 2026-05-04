@@ -156,3 +156,71 @@ class SeguimientoBeneficiario(models.Model):
 
     def __str__(self):
         return f"Seguimiento {self.id_seguimiento} - {self.id_beneficiario.id_expediente.nombre}"
+    
+#tablas para el apoyo y obligaciones del beneficiario del SPRINT 4
+
+class ApoyoEconomico(models.Model):
+    id_apoyo = models.AutoField(primary_key=True)
+    concepto = models.CharField(max_length=150)
+    monto = models.DecimalField(max_digits=20, decimal_places=2)
+    fecha_entrega = models.DateField()
+    #fecha automatica de creacion 
+    fecha_creacion = models.DateField(auto_now_add=True) 
+    estatus = models.CharField(max_length=50, default='Entregado') 
+    
+    id_seguimiento = models.ForeignKey(
+        SeguimientoBeneficiario, 
+        on_delete=models.CASCADE, 
+        related_name='apoyos_economicos',
+        db_column='id_seguimiento'
+    )
+
+    class Meta:
+        db_table = 'apoyo_economico'
+        verbose_name_plural = 'Apoyos Económicos'
+
+    def __str__(self):
+        return f"{self.concepto} - ${self.monto}"
+
+
+class UsoServicios(models.Model):
+    id_servicio = models.AutoField(primary_key=True)
+    fecha_realizacion = models.DateField()
+    asistencia = models.CharField(max_length=20) 
+    tipo_servicio = models.CharField(max_length=100) # Ej: "Psicología", "Médico", "Comedor"
+    
+    id_seguimiento = models.ForeignKey(
+        SeguimientoBeneficiario, 
+        on_delete=models.CASCADE, 
+        related_name='usos_servicios',
+        db_column='id_seguimiento'
+    )
+
+    class Meta:
+        db_table = 'uso_servicios'
+        verbose_name_plural = 'Uso de Servicios'
+
+    def __str__(self):
+        return f"{self.tipo_servicio} - {self.fecha_realizacion}"
+
+
+class Obligacion(models.Model):
+    id_servicio_social = models.AutoField(primary_key=True)
+    tipo = models.CharField(max_length=100) # Ej: "Faena", "Taller para padres"
+    fecha = models.DateField()
+    estatus = models.CharField(max_length=50, default='Pendiente')
+    observaciones = models.TextField(null=True, blank=True)
+    
+    id_seguimiento = models.ForeignKey(
+        SeguimientoBeneficiario, 
+        on_delete=models.CASCADE, 
+        related_name='obligaciones',
+        db_column='id_seguimiento'
+    )
+
+    class Meta:
+        db_table = 'obligacion'
+        verbose_name_plural = 'Obligaciones'
+
+    def __str__(self):
+        return f"{self.tipo} - {self.estatus}"

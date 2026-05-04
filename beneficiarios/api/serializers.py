@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.core.validators import RegexValidator
-from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario
+from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion
 from estudios.models import Familia
 from estudios.api.serializers import FamiliaSerializer
 from escolaridad.api.serializers import DatosEscolaresSerializer
@@ -8,7 +8,7 @@ from escolaridad.api.serializers import DatosEscolaresSerializer
 letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', message='Solo letras y espacios.')
 telefono_regex = RegexValidator(regex=r'^\d{10}$', message='Exactamente 10 dígitos.')
 cp_regex = RegexValidator(regex=r'^\d{5}$', message='Exactamente 5 dígitos.')
-
+alfanumerico_regex = RegexValidator(regex=r'^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s.,-]+$', message='Solo letras, números y caracteres básicos.')
 
 class DireccionSerializer(serializers.ModelSerializer):
     cp = serializers.CharField(validators=[cp_regex])
@@ -106,12 +106,45 @@ class VisitaPostulanteSerializer(serializers.ModelSerializer):
         model = Visita_Postulante
         fields = '__all__'
 
+#Sprint 4 
+
+class ApoyoEconomicoSerializer(serializers.ModelSerializer):
+    concepto = serializers.CharField(validators=[alfanumerico_regex])
+    estatus = serializers.CharField(validators=[letras_regex], required=False)
+
+    class Meta:
+        model = ApoyoEconomico
+        fields = '__all__'
+
+    # Validación financiera: Evitar montos en $0 o negativos
+    def validate_monto(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("El monto del apoyo económico debe ser mayor a cero.")
+        return value
+    
+class UsoServiciosSerializer(serializers.ModelSerializer):
+    asistencia = serializers.CharField(validators=[letras_regex])
+    tipo_servicio = serializers.CharField(validators=[letras_regex])
+
+    class Meta:
+        model = UsoServicios
+        fields = '__all__'
+
+class ObligacionSerializer(serializers.ModelSerializer):
+    tipo = serializers.CharField(validators=[alfanumerico_regex])
+    estatus = serializers.CharField(validators=[letras_regex], required=False)
+
+    class Meta:
+        model = Obligacion
+        fields = '__all__'
 
 # mandare todo el paquete de datos en un solo json anidado para el seguimiento del beneficairio
 class SeguimientoBeneficiarioSerializer(serializers.ModelSerializer):
     # Traemos los datos escolares (y sus boletas anidadas)
     datos_escolares = DatosEscolaresSerializer(read_only=True)
-
+    apoyos_economicos = ApoyoEconomicoSerializer(many=True, read_only=True)
+    usos_servicios = UsoServiciosSerializer(many=True, read_only=True)
+    obligaciones = ObligacionSerializer(many=True, read_only=True)
     class Meta:
         model = SeguimientoBeneficiario
         fields = '__all__'
