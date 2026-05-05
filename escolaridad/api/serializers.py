@@ -55,3 +55,17 @@ class DatosEscolaresSerializer(serializers.ModelSerializer):
     class Meta:
         model = DatosEscolares
         fields = '__all__'
+
+    #mandamos campos a seguimiento
+    def to_representation(self, instance):
+        #obtenemos json de ids
+        representacion = super().to_representation(instance)
+
+        #rjalamos informacion de cada tabla 
+        if instance.id_escolaridad:
+            representacion['id_escolaridad'] = EscolaridadSerializer(instance.id_escolaridad).data
+            
+        if instance.id_institucion:
+            representacion['id_institucion'] = InstitucionSerializer(instance.id_institucion).data
+
+        return representacion
