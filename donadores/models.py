@@ -44,10 +44,17 @@ class Donador(models.Model):
         return f"{self.nombre}{apellido} ({self.tipo})"
 
 class DonativoDonador(models.Model):
+    MONEDA_CHOICES = [
+        ('MXN', 'Pesos Mexicanos'),
+        ('USD', 'Dólares Estadounidenses'),
+        ('EUR', 'Euros'),
+    ]
+
     id_donativo = models.AutoField(primary_key=True)
     concepto = models.CharField(max_length=100)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     fecha = models.DateField()
+    moneda = models.CharField(max_length=3, choices=MONEDA_CHOICES, default='MXN')
     
     #llaves foraneas
     id_donador = models.ForeignKey(
@@ -68,4 +75,4 @@ class DonativoDonador(models.Model):
         verbose_name_plural = 'Donativos'
 
     def __str__(self):
-        return f"Donativo {self.monto} - {self.id_donador.nombre}"
+        return f"Donativo {self.monto} {self.moneda} - {self.id_donador.nombre}"
