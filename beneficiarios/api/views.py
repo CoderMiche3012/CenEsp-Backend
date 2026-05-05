@@ -46,5 +46,23 @@ class ObligacionViewSet(viewsets.ModelViewSet):
     serializer_class = ObligacionSerializer
 
 class SeguimientoBeneficiarioViewSet(viewsets.ModelViewSet):
-    queryset = SeguimientoBeneficiario.objects.all()
     serializer_class = SeguimientoBeneficiarioSerializer
+
+    def get_queryset(self):
+        #listamos seguimientos
+        queryset = SeguimientoBeneficiario.objects.all()
+        
+        #jalamos los parametros a la url
+        beneficiario_id = self.request.query_params.get('id_beneficiario', None)
+        periodo_id = self.request.query_params.get('id_periodo', None)
+
+        #creamos el filtro
+        if beneficiario_id is not None:
+            queryset = queryset.filter(id_beneficiario=beneficiario_id)
+            
+        #filtramos por id periodo
+        if periodo_id is not None:
+            queryset = queryset.filter(id_periodo=periodo_id)
+
+        #mandamos la lista filtrada
+        return queryset
