@@ -2,6 +2,10 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion
 from .serializers import DireccionSerializer, ExpedienteSerializer, PostulanteSerializer, VisitaPostulanteSerializer, BeneficiarioSerializer, FotografiasSerializer, SeguimientoBeneficiarioSerializer, ApoyoEconomicoSerializer, UsoServiciosSerializer, ObligacionSerializer
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+
 
 class DireccionViewSet(viewsets.ModelViewSet):
     queryset = Direccion.objects.all()
@@ -40,6 +44,22 @@ class ApoyoEconomicoViewSet(viewsets.ModelViewSet):
 class UsoServiciosViewSet(viewsets.ModelViewSet):
     queryset = UsoServicios.objects.all()
     serializer_class = UsoServiciosSerializer
+
+    @action(detail=False, methods=['post'])
+    def registro_masivo(self, request):
+        #carga de datos
+        serializer = self.get_serializer(data=request.data, many=True)
+        
+        #validamos los datos recibidos 
+        if serializer.is_valid():
+
+            serializer.save()
+            return Response(
+                {"mensaje": f"Se guardaron {len(serializer.validated_data)} asistencias exitosamente."}, 
+                status=status.HTTP_201_CREATED
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ObligacionViewSet(viewsets.ModelViewSet):
     queryset = Obligacion.objects.all()
