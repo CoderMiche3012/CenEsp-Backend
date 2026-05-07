@@ -4,6 +4,7 @@ from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postu
 from estudios.models import Familia
 from estudios.api.serializers import FamiliaSerializer
 from escolaridad.api.serializers import DatosEscolaresSerializer
+from django.db.models import Count
 
 letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', message='Solo letras y espacios.')
 telefono_regex = RegexValidator(regex=r'^\d{10}$', message='Exactamente 10 dígitos.')
@@ -125,7 +126,8 @@ class ApoyoEconomicoSerializer(serializers.ModelSerializer):
 class UsoServiciosSerializer(serializers.ModelSerializer):
     asistencia = serializers.CharField(validators=[letras_regex])
     tipo_servicio = serializers.CharField(validators=[letras_regex])
-    numero_acompanantes = serializers.CharField(validators=[alfanumerico_regex])
+    numero_acompanantes = serializers.IntegerField(min_value=0, required=False)
+    #contador_asistencias = 
     class Meta:
         model = UsoServicios
         fields = '__all__'
@@ -145,6 +147,7 @@ class SeguimientoBeneficiarioSerializer(serializers.ModelSerializer):
     apoyos_economicos = ApoyoEconomicoSerializer(many=True, read_only=True)
     usos_servicios = UsoServiciosSerializer(many=True, read_only=True)
     obligaciones = ObligacionSerializer(many=True, read_only=True)
+
     class Meta:
         model = SeguimientoBeneficiario
         fields = '__all__'
