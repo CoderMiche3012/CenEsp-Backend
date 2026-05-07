@@ -17,6 +17,8 @@ class Institucion(models.Model):
     id_institucion = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=150)
     clave_escolar = models.CharField(max_length=50, null=True, blank=True)
+    #municipio_escuela
+    #agregar diccionario con todos los municipios de oaxaca con la posibilidad de agregar mas si falta alguno
 
     class Meta:
         db_table = 'institucion'

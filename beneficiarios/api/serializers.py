@@ -125,7 +125,7 @@ class ApoyoEconomicoSerializer(serializers.ModelSerializer):
 class UsoServiciosSerializer(serializers.ModelSerializer):
     asistencia = serializers.CharField(validators=[letras_regex])
     tipo_servicio = serializers.CharField(validators=[letras_regex])
-
+    numero_acompanantes = serializers.CharField(validators=[alfanumerico_regex])
     class Meta:
         model = UsoServicios
         fields = '__all__'

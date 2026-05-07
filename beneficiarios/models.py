@@ -187,7 +187,11 @@ class UsoServicios(models.Model):
     id_servicio = models.AutoField(primary_key=True)
     fecha_realizacion = models.DateField()
     asistencia = models.CharField(max_length=20) 
-    tipo_servicio = models.CharField(max_length=100) # Ej: "Psicología", "Médico", "Comedor"
+    tipo_servicio = models.CharField(max_length=100) 
+    numero_acompanantes = models.IntegerField(
+        default=0, 
+        help_text="Cantidad de familiares o personas que entraron al servicio con el niño"
+    )
     
     id_seguimiento = models.ForeignKey(
         SeguimientoBeneficiario, 
