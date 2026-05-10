@@ -60,14 +60,45 @@ class UsoServiciosViewSet(viewsets.ModelViewSet):
             )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['put'])
+    def edicion_masiva(self, request):
+        datos = request.data
+        
+        if not isinstance(datos, list):
+            return Response({"error": "Se esperaba una lista de objetos"}, status=status.HTTP_400_BAD_REQUEST)
+
+        ids_servicios = [item['id_servicio'] for item in datos if 'id_servicio' in item]
+        instancias = UsoServicios.objects.filter(id_servicio__in=ids_servicios)
+        datos_nuevos = {item['id_servicio']: item for item in datos if 'id_servicio' in item}
+
+        instancias_a_actualizar = []
+        for instancia in instancias:
+            nuevo_dato = datos_nuevos.get(instancia.id_servicio)
+            if nuevo_dato:
+                if 'asistencia' in nuevo_dato:
+                    instancia.asistencia = nuevo_dato['asistencia']
+                if 'numero_acompanantes' in nuevo_dato:
+                    instancia.numero_acompanantes = nuevo_dato['numero_acompanantes']
+
+                instancias_a_actualizar.append(instancia)
+
+        if instancias_a_actualizar:
+            UsoServicios.objects.bulk_update(instancias_a_actualizar, ['asistencia', 'numero_acompanantes'])
+
+        return Response(
+            {"mensaje": f"Se editaron {len(instancias_a_actualizar)} registros exitosamente."}, 
+            status=status.HTTP_200_OK
+        )
 
 class ObligacionViewSet(viewsets.ModelViewSet):
     queryset = Obligacion.objects.all()
     serializer_class = ObligacionSerializer
 
 class SeguimientoBeneficiarioViewSet(viewsets.ModelViewSet):
+    queryset = SeguimientoBeneficiario.objects.prefetch_related('usos_servicios').all()
     serializer_class = SeguimientoBeneficiarioSerializer
-
+    
     def get_queryset(self):
         #listamos seguimientos
         queryset = SeguimientoBeneficiario.objects.all()

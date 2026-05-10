@@ -124,7 +124,6 @@ class ApoyoEconomicoSerializer(serializers.ModelSerializer):
         return value
     
 class UsoServiciosSerializer(serializers.ModelSerializer):
-    asistencia = serializers.CharField(validators=[letras_regex])
     tipo_servicio = serializers.CharField(validators=[letras_regex])
     numero_acompanantes = serializers.IntegerField(min_value=0, required=False)
     #contador_asistencias = 
@@ -133,6 +132,7 @@ class UsoServiciosSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ObligacionSerializer(serializers.ModelSerializer):
+    asistencia = serializers.BooleanField(default=False)
     tipo = serializers.CharField(validators=[alfanumerico_regex])
     estatus = serializers.CharField(validators=[letras_regex], required=False)
 

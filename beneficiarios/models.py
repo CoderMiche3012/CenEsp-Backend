@@ -186,15 +186,12 @@ class ApoyoEconomico(models.Model):
 class UsoServicios(models.Model):
     id_servicio = models.AutoField(primary_key=True)
     fecha_realizacion = models.DateField()
-    asistencia = models.CharField(max_length=20) 
+    asistencia = models.BooleanField(default=False) 
     tipo_servicio = models.CharField(max_length=100) 
     numero_acompanantes = models.IntegerField(
         default=0, 
-        help_text="Cantidad de familiares o personas que entraron al servicio con el niño",
-        null=True, 
         blank=True
     )
-    es_familiar = models.BooleanField(default=False)
     
     id_seguimiento = models.ForeignKey(
         SeguimientoBeneficiario, 
