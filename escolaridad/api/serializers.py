@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.core.validators import RegexValidator
-from escolaridad.models import Escolaridad, Institucion, DatosEscolares, Boleta
+from escolaridad.models import Escolaridad, Institucion, DatosEscolares, Boleta, MunicipioEscuela
 
 #validaciones
 letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s.,]+$', message='Solo letras y puntuación básica.')
@@ -19,14 +19,27 @@ class EscolaridadSerializer(serializers.ModelSerializer):
         model = Escolaridad
         fields = '__all__'
 
+class MunicipioEscuelaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MunicipioEscuela
+        fields = '__all__'
 
 class InstitucionSerializer(serializers.ModelSerializer):
     nombre = serializers.CharField(validators=[alfanumerico_regex])
-    clave_escolar = serializers.CharField(validators=[clave_escolar_regex], required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Institucion
         fields = '__all__'
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        
+        if instance.municipio_escuela:
+            representation['municipio_nombre'] = instance.municipio_escuela.nombre
+        else:
+            representation['municipio_nombre'] = "Sin asignar"
+            
+        return representation
 
 
 class BoletaSerializer(serializers.ModelSerializer):

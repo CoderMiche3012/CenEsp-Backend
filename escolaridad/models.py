@@ -13,12 +13,22 @@ class Escolaridad(models.Model):
     def __str__(self):
         return f"{self.nivel_escolar} - {self.grado_escolar}"
 
+class MunicipioEscuela(models.Model):
+    nombre = models.CharField(max_length=170, unique=True)
+
+    def __str__(self):
+        return self.nombre
+    
 class Institucion(models.Model):
     id_institucion = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=150)
-    clave_escolar = models.CharField(max_length=50, null=True, blank=True)
-    #municipio_escuela
-    #agregar diccionario con todos los municipios de oaxaca con la posibilidad de agregar mas si falta alguno
+    #manejare los municipios de la escuela para cargarlos con un script bien joya
+    municipio_escuela = models.ForeignKey(
+        MunicipioEscuela, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
 
     class Meta:
         db_table = 'institucion'
