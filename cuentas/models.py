@@ -14,10 +14,7 @@ class Permiso(models.Model):
 class Rol(models.Model):
     id_rol = models.AutoField(primary_key=True)
     nombre_rol = models.CharField(max_length=50, unique=True)
-    descripcion = models.TextField(blank=True, null=True) # Nuevo campo
-    
-    # Aquí creamos la relación Muchos a Muchos. 
-    # db_table='rol_permiso' fuerza a Django a nombrar la tabla intermedia exactamente como en tu diagrama
+    descripcion = models.TextField(blank=True, null=True) 
     permisos = models.ManyToManyField(Permiso, related_name='roles', db_table='rol_permiso', blank=True)
 
     def __str__(self):
@@ -52,15 +49,12 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     correo = models.EmailField(unique=True)
     telefono = models.CharField(max_length=15, blank=True, null=True)
     estatus = models.BooleanField(default=True)
-    
-    id_rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, related_name='usuarios')
 
+    id_rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, related_name='usuarios')
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False) 
 
     objects = UsuarioManager()
-
-    #el login sera con nombre de usuario
     USERNAME_FIELD = 'nom_usuario' 
     REQUIRED_FIELDS = ['correo', 'nombre', 'apellido_p'] 
 

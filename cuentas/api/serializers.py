@@ -23,7 +23,6 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Usuario
-        # 2. lista actualizada con los pass
         fields = [
             'id_usuario', 'nom_usuario', 'nombre', 'apellido_p', 
             'apellido_m', 'correo', 'telefono', 'id_rol', 'estatus', 
@@ -32,13 +31,12 @@ class UsuarioSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'password': {'write_only': True, 'required': False}
         }
-    # 1. Validación del Teléfono (Exactamente 10 dígitos)
+        
     def validate_telefono(self, value):
         if value and not re.match(r'^\d{10}$', value):
             raise serializers.ValidationError("El teléfono debe contener exactamente 10 números.")
         return value
 
-   # 2. Validación de la Contraseña (Seguridad fuerte)
     def validate_password(self, value):
         patron = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[-/#$_@*!?])[A-Za-z\d\-/#$_@*!?]{8,}$'
         
@@ -49,13 +47,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
             )
         return value
 
-    # 3. Validación del Nombre de Usuario (Sin espacios, solo letras, números y guiones bajos)
     def validate_nom_usuario(self, value):
         if not re.match(r'^[\w]+$', value):
             raise serializers.ValidationError("El nombre de usuario solo puede contener letras, números y guiones bajos, sin espacios.")
         return value
 
-    # 4. Validación de Nombre y Apellidos (Solo letras y espacios)
     def validate_nombre(self, value):
         if not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', value):
             raise serializers.ValidationError("El nombre solo debe contener letras.")
@@ -67,12 +63,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
         return value
     
     def validate_apellido_m(self, value):
-            # El 'if value' permite que el campo se quede en blanco si el usuario no tiene apellido materno
             if value and not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', value):
                 raise serializers.ValidationError("El apellido materno solo debe contener letras.")
             return value
-
-    #correccion para que no se duplique el correo (brian@gmail.com y Brian@gmail.com)
+    
     def validate_correo(self, value):
         correo_normalizado = value.lower()
         
@@ -81,7 +75,6 @@ class UsuarioSerializer(serializers.ModelSerializer):
             
         return correo_normalizado
 
-    # Creación segura del usuario
     def create(self, validated_data):
         usuario = Usuario.objects.create_user(
             nom_usuario=validated_data['nom_usuario'],

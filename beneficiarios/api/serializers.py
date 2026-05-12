@@ -132,7 +132,6 @@ class UsoServiciosSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ObligacionSerializer(serializers.ModelSerializer):
-    asistencia = serializers.BooleanField(default=False)
     tipo = serializers.CharField(validators=[alfanumerico_regex])
     estatus = serializers.CharField(validators=[letras_regex], required=False)
 
