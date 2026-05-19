@@ -3,7 +3,6 @@ from beneficiarios.models import Beneficiario
 from periodos.models import Periodo
 
 class Donador(models.Model):
-    #los 3 tipos de donadores que hay 
     TIPO_CHOICES = [
         ('CEI', 'CEI'),
         ('CANFRO', 'CANFRO'),
@@ -18,7 +17,7 @@ class Donador(models.Model):
     correo = models.EmailField(max_length=50, null=True, blank=True)
     telefono = models.CharField(max_length=15, null=True, blank=True)
     estatus = models.CharField(max_length=20, default='Activo')
-    fecha_ingreso = models.DateField() #quiero fecha personalizada
+    fecha_ingreso = models.DateField() 
     nota = models.TextField(null=True, blank=True)
     calle = models.CharField(max_length=100, null=True, blank=True)
     numero = models.CharField(max_length=10, null=True, blank=True)
@@ -27,7 +26,7 @@ class Donador(models.Model):
     localidad = models.CharField(max_length=50, default='Oaxaca')
     pais = models.CharField(max_length=50, default='México')
 
-    #relacion con beneficiario para la tabla intermedia 
+    #Tabla intermedia 
     beneficiarios_apoyados = models.ManyToManyField(
         Beneficiario, 
         related_name='padrinos',
@@ -56,7 +55,6 @@ class DonativoDonador(models.Model):
     fecha = models.DateField()
     moneda = models.CharField(max_length=3, choices=MONEDA_CHOICES, default='MXN')
     
-    #llaves foraneas
     id_donador = models.ForeignKey(
         Donador, 
         on_delete=models.CASCADE, 

@@ -29,8 +29,6 @@ class ExpedienteSerializer(serializers.ModelSerializer):
     apellido_p = serializers.CharField(validators=[letras_regex])
     apellido_m = serializers.CharField(validators=[letras_regex], required=False, allow_blank=True, allow_null=True)
     telefono = serializers.CharField(validators=[telefono_regex], required=False, allow_blank=True, allow_null=True)
-    
-    # Anidaciones
     id_direccion = DireccionSerializer(required=False, allow_null=True)
     familia = FamiliaSerializer(many=True, required=False, write_only=True)
     fotografias = FotografiasSerializer(many=True, read_only=True)
@@ -62,7 +60,7 @@ class ExpedienteSerializer(serializers.ModelSerializer):
         return response
 
 class PostulanteSerializer(serializers.ModelSerializer):
-    registrado_por = serializers.SerializerMethodField() #para mostrar al usuario que lo registro 
+    registrado_por = serializers.SerializerMethodField() 
     id_expediente = ExpedienteSerializer()
 
     class Meta:
@@ -70,9 +68,7 @@ class PostulanteSerializer(serializers.ModelSerializer):
         fields = ['id_postulante', 'estatus', 'id_usuario', 'registrado_por', 'id_expediente']
 
     def get_registrado_por(self, obj):
-        # Verificamos que tenga un usuario asignado para que no truene si es null
         if obj.id_usuario:
-            # Usamos los nombres exactos de los campos de TU tabla de usuarios
             return f"{obj.id_usuario.nombre} {obj.id_usuario.apellido_p}"
         return "Sistema"
     
@@ -126,7 +122,6 @@ class ApoyoEconomicoSerializer(serializers.ModelSerializer):
 class UsoServiciosSerializer(serializers.ModelSerializer):
     tipo_servicio = serializers.CharField(validators=[letras_regex])
     numero_acompanantes = serializers.IntegerField(min_value=0, required=False)
-    #contador_asistencias = 
     class Meta:
         model = UsoServicios
         fields = '__all__'

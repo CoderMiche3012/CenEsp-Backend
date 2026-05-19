@@ -22,7 +22,6 @@ class MunicipioEscuela(models.Model):
 class Institucion(models.Model):
     id_institucion = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=150)
-    #manejare los municipios de la escuela para cargarlos con un script bien joya
     municipio_escuela = models.ForeignKey(
         MunicipioEscuela, 
         on_delete=models.SET_NULL, 
@@ -45,7 +44,6 @@ class DatosEscolares(models.Model):
     nota_escolar = models.TextField(null=True, blank=True)
     modalidad_educativa = models.CharField(max_length=100, null=True, blank=True)
 
-    # Llaves Foráneas
     id_escolaridad = models.ForeignKey(
         Escolaridad, 
         on_delete=models.PROTECT, 

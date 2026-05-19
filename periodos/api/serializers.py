@@ -3,7 +3,6 @@ from django.core.validators import RegexValidator
 from periodos.models import Periodo
 
 class PeriodoSerializer(serializers.ModelSerializer):
-    # Expresión regular: 4 números, un guion, 4 números
     ciclo_escolar = serializers.CharField(
         validators=[RegexValidator(
             regex=r'^\d{4}-\d{4}$', 

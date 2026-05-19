@@ -94,7 +94,6 @@ class Visita_Postulante(models.Model):
     
 class Beneficiario(models.Model):
     id_beneficiario = models.AutoField(primary_key=True)
-    #estatus = models.CharField(max_length=20, default='Activo')
     notas = models.TextField(null=True, blank=True)
     fecha_ingreso = models.DateField(auto_now_add=True)
     
@@ -114,7 +113,7 @@ class Beneficiario(models.Model):
     
 class Fotografias(models.Model):
     id_foto = models.AutoField(primary_key=True)
-    link = models.URLField(max_length=500) 
+    foto_archivo = models.ImageField(upload_to='evidencias_fotos/%Y/%m/', max_length=500, null=True, blank=True) 
     descripcion = models.CharField(max_length=255, blank=True, null=True)
     fecha_carga = models.DateField(auto_now_add=True)
     etapa = models.CharField(max_length=50) 
@@ -164,7 +163,6 @@ class ApoyoEconomico(models.Model):
     concepto = models.CharField(max_length=150)
     monto = models.DecimalField(max_digits=20, decimal_places=2)
     fecha_entrega = models.DateField()
-    #fecha automatica de creacion 
     fecha_creacion = models.DateField(auto_now_add=True) 
     estatus = models.CharField(max_length=50, default='Entregado') 
     
@@ -210,7 +208,7 @@ class UsoServicios(models.Model):
 
 class Obligacion(models.Model):
     id_servicio_social = models.AutoField(primary_key=True)
-    tipo = models.CharField(max_length=100) # Ej: "Faena", "Taller para padres"
+    tipo = models.CharField(max_length=100) 
     fecha = models.DateField()
     estatus = models.CharField(max_length=50, default='Pendiente')
     observaciones = models.TextField(null=True, blank=True)

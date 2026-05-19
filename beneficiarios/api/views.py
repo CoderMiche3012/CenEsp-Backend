@@ -5,6 +5,7 @@ from .serializers import DireccionSerializer, ExpedienteSerializer, PostulanteSe
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 class DireccionViewSet(viewsets.ModelViewSet):
@@ -35,7 +36,15 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
 class FotografiasViewSet(viewsets.ModelViewSet):
     queryset = Fotografias.objects.all()
     serializer_class = FotografiasSerializer
-    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    # 👇 AGREGA ESTA FUNCIÓN TEMPORAL PARA DEPUREAR 👇
+    def create(self, request, *args, **kwargs):
+        print("\n=== 🚨 DIAGNÓSTICO DE CARGA 🚨 ===")
+        print("DATOS DE TEXTO:", request.data)
+        print("ARCHIVOS EN request.FILES:", request.FILES)
+        print("==================================\n")
+        return super().create(request, *args, **kwargs)
 
 class ApoyoEconomicoViewSet(viewsets.ModelViewSet):
     queryset = ApoyoEconomico.objects.all()

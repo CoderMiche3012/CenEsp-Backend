@@ -133,6 +133,12 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles' # Para el Deploy 
 
+# URL pública por la que Dalia va a consultar los archivos
+MEDIA_URL = '/media/'
+
+# Carpeta física 
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Autenticacion de usuario 
 AUTH_USER_MODEL = 'cuentas.Usuario'
 

@@ -62,19 +62,16 @@ class DatosEscolaresSerializer(serializers.ModelSerializer):
     especialidad = serializers.CharField(validators=[letras_regex], required=False, allow_blank=True, allow_null=True)
     turno = serializers.CharField(validators=[letras_regex], required=False, allow_blank=True, allow_null=True)
     modalidad_educativa = serializers.CharField(validators=[letras_regex], required=False, allow_blank=True, allow_null=True)
-    
     boletas = BoletaSerializer(many=True, read_only=True)
 
     class Meta:
         model = DatosEscolares
         fields = '__all__'
 
-    #mandamos campos a seguimiento
     def to_representation(self, instance):
-        #obtenemos json de ids
+
         representacion = super().to_representation(instance)
 
-        #rjalamos informacion de cada tabla 
         if instance.id_escolaridad:
             representacion['id_escolaridad'] = EscolaridadSerializer(instance.id_escolaridad).data
             
