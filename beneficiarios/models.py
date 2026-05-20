@@ -129,6 +129,30 @@ class Fotografias(models.Model):
         db_table = 'fotografias'
 
 
+class DocumentosPersonales(models.Model):
+    id_documento = models.AutoField(primary_key=True)
+    nombre_documento = models.CharField(max_length=100) 
+    #acta, curp, comprbante, etc.
+    tipo_documento = models.CharField(max_length=100) 
+    fecha_carga = models.DateField(auto_now_add=True)
+    # FileField acepta cualquier archivo 
+    archivo = models.FileField(upload_to='documentos_personales/%Y/%m/') 
+    
+    
+
+    id_expediente = models.ForeignKey(
+        'Expediente', 
+        on_delete=models.CASCADE, 
+        db_column='id_expediente',
+        related_name='documentos_personales'
+    )
+
+    class Meta:
+        db_table = 'documentos_personales'
+
+    def __str__(self):
+        return f"{self.tipo_documento} - Expediente {self.id_expediente_id}"
+
 class SeguimientoBeneficiario(models.Model):
     id_seguimiento = models.AutoField(primary_key=True)
     nota_seguimiento = models.TextField()

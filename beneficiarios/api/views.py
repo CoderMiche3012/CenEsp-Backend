@@ -1,12 +1,11 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion
-from .serializers import DireccionSerializer, ExpedienteSerializer, PostulanteSerializer, VisitaPostulanteSerializer, BeneficiarioSerializer, FotografiasSerializer, SeguimientoBeneficiarioSerializer, ApoyoEconomicoSerializer, UsoServiciosSerializer, ObligacionSerializer
+from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales
+from .serializers import DireccionSerializer, ExpedienteSerializer, PostulanteSerializer, VisitaPostulanteSerializer, BeneficiarioSerializer, FotografiasSerializer, SeguimientoBeneficiarioSerializer, ApoyoEconomicoSerializer, UsoServiciosSerializer, ObligacionSerializer, DocumentosPersonalesSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
-
 
 class DireccionViewSet(viewsets.ModelViewSet):
     queryset = Direccion.objects.all()
@@ -37,22 +36,25 @@ class FotografiasViewSet(viewsets.ModelViewSet):
     queryset = Fotografias.objects.all()
     serializer_class = FotografiasSerializer
     parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
 
-    # 👇 AGREGA ESTA FUNCIÓN TEMPORAL PARA DEPUREAR 👇
-    def create(self, request, *args, **kwargs):
-        print("\n=== 🚨 DIAGNÓSTICO DE CARGA 🚨 ===")
-        print("DATOS DE TEXTO:", request.data)
-        print("ARCHIVOS EN request.FILES:", request.FILES)
-        print("==================================\n")
-        return super().create(request, *args, **kwargs)
+class DocumentosPersonalesViewSet(viewsets.ModelViewSet):
+    queryset = DocumentosPersonales.objects.all()
+    serializer_class = DocumentosPersonalesSerializer
+    
+    # Fundamental para permitir la carga de archivos físicos (PDF, Doc, etc.)
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
 
 class ApoyoEconomicoViewSet(viewsets.ModelViewSet):
     queryset = ApoyoEconomico.objects.all()
     serializer_class = ApoyoEconomicoSerializer
+    permission_classes = [IsAuthenticated]
 
 class UsoServiciosViewSet(viewsets.ModelViewSet):
     queryset = UsoServicios.objects.all()
     serializer_class = UsoServiciosSerializer
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['post'])
     def registro_masivo(self, request):
@@ -69,6 +71,7 @@ class UsoServiciosViewSet(viewsets.ModelViewSet):
             )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
     
     @action(detail=False, methods=['put'])
     def edicion_masiva(self, request):
@@ -103,10 +106,12 @@ class UsoServiciosViewSet(viewsets.ModelViewSet):
 class ObligacionViewSet(viewsets.ModelViewSet):
     queryset = Obligacion.objects.all()
     serializer_class = ObligacionSerializer
+    permission_classes = [IsAuthenticated]
 
 class SeguimientoBeneficiarioViewSet(viewsets.ModelViewSet):
     queryset = SeguimientoBeneficiario.objects.prefetch_related('usos_servicios').all()
     serializer_class = SeguimientoBeneficiarioSerializer
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         #listamos seguimientos

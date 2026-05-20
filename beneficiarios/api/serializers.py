@@ -1,6 +1,7 @@
+import os
 from rest_framework import serializers
 from django.core.validators import RegexValidator
-from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion
+from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales
 from estudios.models import Familia
 from estudios.api.serializers import FamiliaSerializer
 from escolaridad.api.serializers import DatosEscolaresSerializer
@@ -20,9 +21,71 @@ class DireccionSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class FotografiasSerializer(serializers.ModelSerializer):
+    etapa = serializers.CharField(
+        max_length=50,
+        validators=[alfanumerico_regex] 
+    )
+    descripcion = serializers.CharField(
+        max_length=255,
+        validators=[alfanumerico_regex],
+        required=False, 
+        allow_blank=True,
+        allow_null=True
+    )
+
     class Meta:
         model = Fotografias
         fields = '__all__'
+
+    def validate_foto_archivo(self, value):
+  
+        if not value:
+            return value
+            
+        # Límite de 3MB para fotos
+        limite_tamano = 10 * 1024 * 1024 
+        
+        if value.size > limite_tamano:
+            raise serializers.ValidationError(
+                "La fotografía es demasiado pesada. El tamaño máximo permitido es de 3MB."
+            )
+            
+        return value
+
+class DocumentosPersonalesSerializer(serializers.ModelSerializer):
+    # Inyectamos tus validadores regex directamente en los campos
+    nombre_documento = serializers.CharField(
+        max_length=100, 
+        validators=[alfanumerico_regex]
+    )
+    tipo_documento = serializers.CharField(
+        max_length=100, 
+        validators=[alfanumerico_regex] # O letras_regex, el que prefieras
+    )
+
+    class Meta:
+        model = DocumentosPersonales
+        fields = '__all__'
+
+    def validate_archivo(self, value):
+        """
+        Validación del archivo físico.
+        """
+        extension = os.path.splitext(value.name)[1].lower()
+        formatos_permitidos = ['.pdf', '.docx', '.jpg', '.jpeg', '.png']
+        
+        if extension not in formatos_permitidos:
+            raise serializers.ValidationError(
+                "Formato no válido. Solo PDF, Word (.docx) o imágenes (JPG, PNG)."
+            )
+            
+        limite_tamano = 5 * 1024 * 1024  # 5MB
+        if value.size > limite_tamano:
+            raise serializers.ValidationError(
+                "El archivo supera los 5MB permitidos."
+            )
+            
+        return value
 
 class ExpedienteSerializer(serializers.ModelSerializer):
     nombre = serializers.CharField(validators=[letras_regex])
