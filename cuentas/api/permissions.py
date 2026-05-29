@@ -1,7 +1,6 @@
 from rest_framework import permissions
 
 class EsAdminODueno(permissions.BasePermission):
-    # ... (Este se queda exactamente igual, no le muevas nada) ...
     def has_object_permission(self, request, view, obj):
         if request.user.is_superuser:
             return True
@@ -17,7 +16,6 @@ class EsAdmin(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        # 1. Protege la lista general (GET general) y la creación (POST)
         if not request.user or not request.user.is_authenticated:
             return False
         
@@ -27,8 +25,45 @@ class EsAdmin(permissions.BasePermission):
         return es_super or es_admin
 
     def has_object_permission(self, request, view, obj):
-        # 2. Protege un rol en específico (GET por ID, PUT, PATCH, DELETE)
         es_super = request.user.is_superuser
         es_admin = request.user.id_rol and request.user.id_rol.nombre_rol == 'Administrador'
         
         return es_super or es_admin
+
+class TienePermisoModulo(permissions.BasePermission):
+    """
+    Candado Maestro: Traduce el método HTTP y busca el permiso exacto 
+    (ej. 'usuarios.crear') en el rol del usuario.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+            
+        if request.user.is_superuser:
+            return True
+
+        if not request.user.id_rol:
+            return False
+
+        metodo = request.method
+        if metodo in permissions.SAFE_METHODS:  
+            accion = 'ver'
+        elif metodo == 'POST':
+            accion = 'crear'
+        elif metodo in ['PUT', 'PATCH']:
+            accion = 'editar'
+        elif metodo == 'DELETE':
+            accion = 'eliminar'
+        else:
+            return False
+
+        modulo = getattr(view, 'modulo_permiso', None)
+        
+        if not modulo:
+            return False
+
+        permiso_requerido = f"{modulo}.{accion}"
+        
+        tiene_permiso = request.user.id_rol.permisos.filter(nombre_permiso=permiso_requerido).exists()
+        
+        return tiene_permiso

@@ -53,6 +53,9 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     id_rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, related_name='usuarios')
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False) 
+    #validación para bloqueo por intentos fallidos por inicio de sesion
+    intentos_fallidos = models.IntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(blank=True, null=True)
 
     objects = UsuarioManager()
     USERNAME_FIELD = 'nom_usuario' 
