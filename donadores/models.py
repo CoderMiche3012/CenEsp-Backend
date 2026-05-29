@@ -1,32 +1,40 @@
 from django.db import models
-from beneficiarios.models import Beneficiario
+from beneficiarios.models import Beneficiario, Direccion
 from periodos.models import Periodo
+
+class CatalogoCP(models.Model):
+
+    cp = models.CharField(max_length=10, unique=True)
+    estado = models.CharField(max_length=50)
+    localidades = models.JSONField(default=list) 
+
+    class Meta:
+        db_table = 'catalogo_cp'
+
 
 class Donador(models.Model):
     TIPO_CHOICES = [
         ('CEI', 'CEI'),
         ('CANFRO', 'CANFRO'),
         ('OYE', 'OYE'),
+        ('PARTICULAR', 'PARTICULAR'), 
+        ('EMPRESA', 'EMPRESA'),
+        ('INSTITUCION', 'INSTITUCIÓN'),
     ]
 
     id_donador = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100)
-    apellido_p = models.CharField(max_length=20, null=True, blank=True )
-    apellido_m = models.CharField(max_length=20, null=True, blank=True )
-    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='CEI')
-    correo = models.EmailField(max_length=50, null=True, blank=True)
-    telefono = models.CharField(max_length=15, null=True, blank=True)
+    apellido_paterno = models.CharField(max_length=50, null=True, blank=True) 
+    apellido_materno = models.CharField(max_length=50, null=True, blank=True) 
+    tipo_donador = models.CharField(max_length=20, choices=TIPO_CHOICES, default='CEI')
+    correo = models.EmailField(max_length=100, unique=True, null=True, blank=True) 
+    telefono = models.CharField(max_length=10, null=True, blank=True)
     estatus = models.CharField(max_length=20, default='Activo')
     fecha_ingreso = models.DateField() 
     nota = models.TextField(null=True, blank=True)
-    calle = models.CharField(max_length=100, null=True, blank=True)
-    numero = models.CharField(max_length=10, null=True, blank=True)
-    colonia = models.CharField(max_length=50, null=True, blank=True)
-    cp = models.CharField(max_length=10, null=True, blank=True)
-    localidad = models.CharField(max_length=50, default='Oaxaca')
-    pais = models.CharField(max_length=50, default='México')
+    domicilio = models.ForeignKey(Direccion, on_delete=models.PROTECT, null=True)
 
-    #Tabla intermedia 
+    # Tabla intermedia 
     beneficiarios_apoyados = models.ManyToManyField(
         Beneficiario, 
         related_name='padrinos',
@@ -39,8 +47,8 @@ class Donador(models.Model):
         verbose_name_plural = 'Donadores'
 
     def __str__(self):
-        apellido = f" {self.apellido_p}" if self.apellido_p else ""
-        return f"{self.nombre}{apellido} ({self.tipo})"
+        apellido = f" {self.apellido_paterno}" if self.apellido_paterno else ""
+        return f"{self.nombre}{apellido} ({self.tipo_donador})"
 
 class DonativoDonador(models.Model):
     MONEDA_CHOICES = [

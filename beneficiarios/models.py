@@ -7,8 +7,10 @@ class Direccion(models.Model):
     calle = models.CharField(max_length=50)
     numero = models.CharField(max_length=5)
     colonia = models.CharField(max_length=50)
-    municipio = models.CharField(max_length=50)
-    cp = models.CharField(max_length=5) # ejemplo 68000
+    municipio = models.CharField(max_length=150, null=True, blank=True)
+    localidad = models.CharField(max_length=100, null=True, blank=True)
+    pais = models.CharField(max_length=100, null=True, blank=True)
+    cp = models.CharField(max_length=5, null=True, blank=True) 
 
     class Meta:
         db_table = 'direccion'
