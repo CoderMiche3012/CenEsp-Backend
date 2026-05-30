@@ -1,7 +1,7 @@
 import os
 from rest_framework import serializers
 from django.core.validators import RegexValidator
-from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales
+from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales, Geografia
 from estudios.models import Familia
 from estudios.api.serializers import FamiliaSerializer
 from escolaridad.api.serializers import DatosEscolaresSerializer
@@ -12,13 +12,24 @@ telefono_regex = RegexValidator(regex=r'^\d{10}$', message='Exactamente 10 dígi
 cp_regex = RegexValidator(regex=r'^\d{5}$', message='Exactamente 5 dígitos.')
 alfanumerico_regex = RegexValidator(regex=r'^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s.,-]+$', message='Solo letras, números y caracteres básicos.')
 
+class GeografiaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Geografia
+        fields = '__all__'
+
+
 class DireccionSerializer(serializers.ModelSerializer):
-    cp = serializers.CharField(validators=[cp_regex])
-    municipio = serializers.CharField(validators=[letras_regex])
+    id_geografia = serializers.PrimaryKeyRelatedField(
+        queryset=Geografia.objects.all(), 
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    geografia_detalle = GeografiaSerializer(source='id_geografia', read_only=True)
 
     class Meta:
         model = Direccion
-        fields = '__all__'
+        fields = ['id_direccion', 'calle', 'numero', 'localidad', 'pais', 'id_geografia', 'geografia_detalle']
 
 class FotografiasSerializer(serializers.ModelSerializer):
     etapa = serializers.CharField(

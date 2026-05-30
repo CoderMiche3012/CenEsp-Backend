@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DireccionViewSet, ExpedienteViewSet, PostulanteViewSet, VisitaPostulanteViewSet, BeneficiarioViewSet, FotografiasViewSet, SeguimientoBeneficiarioViewSet, ApoyoEconomicoViewSet, UsoServiciosViewSet, ObligacionViewSet, DocumentosPersonalesViewSet
+from .views import DireccionViewSet, ExpedienteViewSet, PostulanteViewSet, VisitaPostulanteViewSet, BeneficiarioViewSet, FotografiasViewSet, SeguimientoBeneficiarioViewSet, ApoyoEconomicoViewSet, UsoServiciosViewSet, ObligacionViewSet, DocumentosPersonalesViewSet, GeografiaViewSet
 
 router = DefaultRouter()
 router.register(r'direcciones', DireccionViewSet, basename='direcciones')
@@ -14,6 +14,7 @@ router.register(r'apoyos', ApoyoEconomicoViewSet, basename='apoyo')
 router.register(r'servicios', UsoServiciosViewSet, basename='servicios')
 router.register(r'obligaciones', ObligacionViewSet, basename='obligaciones')
 router.register(r'documentos-personales', DocumentosPersonalesViewSet, basename='documentos-personales')
+router.register(r'geografia', GeografiaViewSet, basename='geografia')
 
 urlpatterns = [
     path('', include(router.urls)),

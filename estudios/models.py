@@ -28,7 +28,6 @@ class EstudioSocioeconomico(models.Model):
 class Analisis(models.Model):
     id_analisis = models.AutoField(primary_key=True)
     prioridad = models.CharField(max_length=50)
-    # FK hacia el estudio (Relación 1 a 1 según las líneas del diagrama)
     id_estudio = models.OneToOneField(EstudioSocioeconomico, on_delete=models.CASCADE)
 
     class Meta:
@@ -41,16 +40,16 @@ class Familia(models.Model):
     apellido_p = models.CharField(max_length=25)
     apellido_m = models.CharField(max_length=25, null=True, blank=True)
     parentesco = models.CharField(max_length=50)
-    edad = models.IntegerField()
+    fecha_nacimiento = models.DateField(null=True, blank=True) 
+    
     actividad_principal = models.CharField(max_length=100)
-    #lo cambie a string 
     salario = models.CharField(max_length=100, null=True, blank=True)
     vive_en_casa = models.BooleanField(default=True)
     telefono = models.CharField(max_length=20, null=True, blank=True)
     es_tutor_principal = models.BooleanField(default=False)
     
     id_expediente = models.ForeignKey(
-        Expediente, 
+        'beneficiarios.Expediente', #busca ruta de expediente
         on_delete=models.CASCADE, 
         db_column='id_expediente',
         related_name='familiares'

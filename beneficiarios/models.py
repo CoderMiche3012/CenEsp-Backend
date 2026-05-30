@@ -6,19 +6,35 @@ class Direccion(models.Model):
     id_direccion = models.AutoField(primary_key=True)
     calle = models.CharField(max_length=50)
     numero = models.CharField(max_length=5)
-    colonia = models.CharField(max_length=50)
-    municipio = models.CharField(max_length=150, null=True, blank=True)
     localidad = models.CharField(max_length=100, null=True, blank=True)
     pais = models.CharField(max_length=100, null=True, blank=True)
-    cp = models.CharField(max_length=5, null=True, blank=True) 
+    
+    id_geografia = models.ForeignKey(
+        'Geografia',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        db_column='id_geografia',
+        related_name='direcciones'
+    )
 
     class Meta:
         db_table = 'direccion'
         verbose_name_plural = 'Direcciones'
 
-    def __str__(self):
-        return f"{self.calle} {self.numero}, {self.colonia}"
+class Geografia(models.Model):
+    id_geografia = models.AutoField(primary_key=True)
+    codigo_postal = models.CharField(max_length=10)
+    municipio = models.CharField(max_length=150)
+    colonia = models.CharField(max_length=150)
+    estado = models.CharField(max_length=100, null=True, blank=True) # Opcional, pero útil
 
+    class Meta:
+        db_table = 'geografia'
+        verbose_name_plural = 'Geografías'
+
+    def __str__(self):
+        return f"{self.codigo_postal} - {self.colonia}, {self.municipio}"
  
 class Expediente(models.Model):
     id_expediente = models.AutoField(primary_key=True)
@@ -37,6 +53,15 @@ class Expediente(models.Model):
         null=True, 
         db_column='id_direccion',
         related_name='expedientes'
+    )
+
+    foto_principal = models.ForeignKey(
+        'Fotografias',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='expedientes_portada',
+        db_column='foto_principal'
     )
 
     class Meta:

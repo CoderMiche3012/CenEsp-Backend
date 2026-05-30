@@ -1,11 +1,54 @@
+import requests
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales
-from .serializers import DireccionSerializer, ExpedienteSerializer, PostulanteSerializer, VisitaPostulanteSerializer, BeneficiarioSerializer, FotografiasSerializer, SeguimientoBeneficiarioSerializer, ApoyoEconomicoSerializer, UsoServiciosSerializer, ObligacionSerializer, DocumentosPersonalesSerializer
+from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales, Geografia
+from .serializers import DireccionSerializer, ExpedienteSerializer, PostulanteSerializer, VisitaPostulanteSerializer, BeneficiarioSerializer, FotografiasSerializer, SeguimientoBeneficiarioSerializer, ApoyoEconomicoSerializer, UsoServiciosSerializer, ObligacionSerializer, DocumentosPersonalesSerializer, GeografiaSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
+
+class GeografiaViewSet(viewsets.ModelViewSet):
+    queryset = Geografia.objects.all()
+    serializer_class = GeografiaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        cp = request.query_params.get('codigo_postal') 
+        if not cp:
+            return super().list(request, *args, **kwargs)
+
+        resultados = Geografia.objects.filter(codigo_postal=cp)
+
+        if not resultados.exists():
+            url = f"http://api.zippopotam.us/MX/{cp}" 
+            
+            try:
+                respuesta_zippopotam = requests.get(url, timeout=5)
+                
+                if respuesta_zippopotam.status_code == 200:
+                    datos = respuesta_zippopotam.json()
+                    estado = datos['places'][0]['state']
+                    
+                    for place in datos['places']:
+                        colonia = place['place name']
+                        municipio = place.get('admin name2', '') 
+                        
+                        Geografia.objects.get_or_create(
+                            codigo_postal=cp,
+                            colonia=colonia,
+                            defaults={
+                                'estado': estado,
+                                'municipio': municipio
+                            }
+                        )
+
+                    resultados = Geografia.objects.filter(codigo_postal=cp)
+                    
+            except requests.RequestException:
+                pass
+        serializer = self.get_serializer(resultados, many=True)
+        return Response(serializer.data)
 
 class DireccionViewSet(viewsets.ModelViewSet):
     queryset = Direccion.objects.all()
@@ -41,8 +84,6 @@ class FotografiasViewSet(viewsets.ModelViewSet):
 class DocumentosPersonalesViewSet(viewsets.ModelViewSet):
     queryset = DocumentosPersonales.objects.all()
     serializer_class = DocumentosPersonalesSerializer
-    
-    # Fundamental para permitir la carga de archivos físicos (PDF, Doc, etc.)
     parser_classes = [MultiPartParser, FormParser]
     permission_classes = [IsAuthenticated]
 
@@ -58,10 +99,8 @@ class UsoServiciosViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def registro_masivo(self, request):
-        #carga de datos
         serializer = self.get_serializer(data=request.data, many=True)
-        
-        #validamos los datos recibidos 
+
         if serializer.is_valid():
 
             serializer.save()
@@ -114,20 +153,14 @@ class SeguimientoBeneficiarioViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        #listamos seguimientos
         queryset = SeguimientoBeneficiario.objects.all()
-        
-        #jalamos los parametros a la url
         beneficiario_id = self.request.query_params.get('id_beneficiario', None)
         periodo_id = self.request.query_params.get('id_periodo', None)
 
-        #creamos el filtro
         if beneficiario_id is not None:
             queryset = queryset.filter(id_beneficiario=beneficiario_id)
-            
-        #filtramos por id periodo
+
         if periodo_id is not None:
             queryset = queryset.filter(id_periodo=periodo_id)
 
-        #mandamos la lista filtrada
         return queryset

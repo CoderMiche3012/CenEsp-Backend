@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.core.validators import RegexValidator
 from donadores.models import Donador, DonativoDonador
-from beneficiarios.models import Beneficiario, Direccion
+from beneficiarios.api.serializers import GeografiaSerializer
+from beneficiarios.models import Beneficiario, Direccion, Geografia
 from django.db import transaction
 from django.utils import timezone
 
@@ -9,9 +10,22 @@ letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s.,&]+$',
 telefono_regex = RegexValidator(regex=r'^\d{10}$', message='Exactamente 10 dígitos.')
 
 class DireccionSerializer(serializers.ModelSerializer):
+    # 1. Recibe el ID numérico desde el frontend al hacer POST/PATCH
+    id_geografia = serializers.PrimaryKeyRelatedField(
+        queryset=Geografia.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    # 2. Despliega el objeto completo con estado, colonia y CP al devolver la respuesta (GET/POST)
+    geografia_detalle = GeografiaSerializer(source='id_geografia', read_only=True)
+
     class Meta:
         model = Direccion
-        fields = ['calle', 'numero', 'colonia', 'municipio', 'localidad', 'pais', 'cp']
+        fields = [
+            'id_direccion', 'calle', 'numero', 'localidad', 
+            'pais', 'id_geografia', 'geografia_detalle' # 👈 Agregamos el detalle expandido
+        ]
 
 class DonadorSerializer(serializers.ModelSerializer):
     nombre = serializers.CharField(validators=[letras_regex])

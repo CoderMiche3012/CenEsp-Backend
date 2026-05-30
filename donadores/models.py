@@ -2,16 +2,6 @@ from django.db import models
 from beneficiarios.models import Beneficiario, Direccion
 from periodos.models import Periodo
 
-class CatalogoCP(models.Model):
-
-    cp = models.CharField(max_length=10, unique=True)
-    estado = models.CharField(max_length=50)
-    localidades = models.JSONField(default=list) 
-
-    class Meta:
-        db_table = 'catalogo_cp'
-
-
 class Donador(models.Model):
     TIPO_CHOICES = [
         ('CEI', 'CEI'),

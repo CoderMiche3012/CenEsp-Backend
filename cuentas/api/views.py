@@ -17,7 +17,7 @@ class RegistroUsuarioView(generics.CreateAPIView):
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
-    permission_classes = [IsAuthenticated, EsAdminODueno] 
+    permission_classes = [IsAuthenticated, TienePermisoModulo]
 
 class RolViewSet(viewsets.ModelViewSet):
     queryset = Rol.objects.all()

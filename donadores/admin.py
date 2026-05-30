@@ -1,8 +1,5 @@
-
 from django.contrib import admin
-from .models import CatalogoCP
+from .models import Donador  # 👈 Asegúrate de importar Geografia y quitar CatalogoCP
 
-@admin.register(CatalogoCP)
-class CatalogoCPAdmin(admin.ModelAdmin):
-    list_display = ('cp', 'estado') 
-    search_fields = ('cp', 'estado')
+# Registras tus modelos actuales
+admin.site.register(Donador)
