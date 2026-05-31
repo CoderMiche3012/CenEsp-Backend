@@ -90,36 +90,48 @@ class UsuarioSerializer(serializers.ModelSerializer):
         return usuario
 
     def validate(self, data):
+            password = data.get('password')
+            confirm_password = data.get('confirm_password')
+            password_actual = data.pop('password_actual', None)
 
-        password = data.get('password')
-        confirm_password = data.get('confirm_password')
-        password_actual = data.pop('password_actual', None)
+            if password:
+                if password != confirm_password:
+                    raise serializers.ValidationError({
+                        "confirm_password": "Las contraseñas no coinciden. Por favor, verifica."
+                    })
 
+                if self.instance:
+                    request_user = self.context['request'].user
+                    es_admin = request_user.is_superuser or (request_user.id_rol and request_user.id_rol.nombre_rol == 'Administrador')
+                    es_su_propio_perfil = (self.instance == request_user)
 
-        if password:
-            if password != confirm_password:
-                raise serializers.ValidationError({
-                    "confirm_password": "Las contraseñas no coinciden. Por favor, verifica."
-                })
+                    # 1. Validación de contraseña actual
+                    if not es_admin or es_su_propio_perfil:
+                        if not password_actual:
+                            raise serializers.ValidationError({
+                                "password_actual": "Debes ingresar tu contraseña actual para autorizar los cambios."
+                            })
+                        if not self.instance.check_password(password_actual):
+                            raise serializers.ValidationError({
+                                "password_actual": "Contraseña actual incorrecta."
+                            })
 
-            if self.instance:
-                            request_user = self.context['request'].user
-                            es_admin = request_user.is_superuser or (request_user.id_rol and request_user.id_rol.nombre_rol == 'Administrador')
-                            es_su_propio_perfil = (self.instance == request_user)
-                            if not es_admin or es_su_propio_perfil:
-                                if not password_actual:
-                                    raise serializers.ValidationError({
-                                        "password_actual": "Debes ingresar tu contraseña actual para autorizar los cambios."
-                                    })
-                                if not self.instance.check_password(password_actual):
-                                    raise serializers.ValidationError({
-                                        "password_actual": "Contraseña actual incorrecta."
-                                    })
+                    # 2. Candado Jerárquico
+                    if not es_su_propio_perfil:
+                        # Protegemos al Súper Admin de los admins normales
+                        if self.instance.is_superuser and not request_user.is_superuser:
+                            raise serializers.ValidationError({
+                                "detail": "No tienes permisos para modificar a un Súper Administrador."
+                            })
+                        
+                        # Protegemos a los Admins entre sí
+                        if self.instance.id_rol and self.instance.id_rol.nombre_rol == 'Administrador' and not request_user.is_superuser:
+                            raise serializers.ValidationError({
+                                "detail": "Un Administrador no puede cambiar la contraseña de otro Administrador."
+                            })
 
-        
-        data.pop('confirm_password', None)
-            
-        return data
+            data.pop('confirm_password', None)
+            return data
     
     def update(self, instance, validated_data):
             validated_data.pop('id_rol', None)
