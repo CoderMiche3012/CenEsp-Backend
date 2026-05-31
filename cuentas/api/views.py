@@ -38,11 +38,6 @@ class PerfilUsuarioView(generics.RetrieveUpdateAPIView):
         return self.request.user
     
     def get_serializer_class(self):
-        """
-        Dynamic Serializer Selection:
-        Si el frontend quiere editar, usamos el UsuarioSerializer (que ya tiene todas las 
-        validaciones de contraseñas y regex). Si solo quiere ver, usamos PerfilUsuarioSerializer.
-        """
         if self.request.method in ['PUT', 'PATCH']:
             return UsuarioSerializer
         return PerfilUsuarioSerializer

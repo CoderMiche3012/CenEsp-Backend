@@ -121,19 +121,18 @@ class UsuarioSerializer(serializers.ModelSerializer):
         
         return data
     
-def update(self, instance, validated_data):
-        #bloqueo de escalamiento de privilegios de roles y permisos
-        validated_data.pop('id_rol', None)
-        validated_data.pop('estatus', None)
-        #actualizacion de contraseña
-        validated_data.pop('confirm_password', None)
-        password_actual = validated_data.pop('password_actual', None)
+    def update(self, instance, validated_data):
+            validated_data.pop('id_rol', None)
+            validated_data.pop('estatus', None)
+            validated_data.pop('confirm_password', None)
+            validated_data.pop('password_actual', None)
+            password = validated_data.pop('password', None)
 
-        password = validated_data.pop('password', None)
-        if password:
-            instance.set_password(password)
-
-        return super().update(instance, validated_data)
+            if password:
+                instance.set_password(password)
+                instance.save() 
+                
+            return super().update(instance, validated_data)
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
