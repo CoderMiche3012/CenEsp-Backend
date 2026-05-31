@@ -103,22 +103,22 @@ class UsuarioSerializer(serializers.ModelSerializer):
                 })
 
             if self.instance:
-                request_user = self.context['request'].user
-                es_admin = request_user.is_superuser or (request_user.id_rol and request_user.id_rol.nombre_rol == 'Administrador')
+                            request_user = self.context['request'].user
+                            es_admin = request_user.is_superuser or (request_user.id_rol and request_user.id_rol.nombre_rol == 'Administrador')
+                            es_su_propio_perfil = (self.instance == request_user)
+                            if not es_admin or es_su_propio_perfil:
+                                if not password_actual:
+                                    raise serializers.ValidationError({
+                                        "password_actual": "Debes ingresar tu contraseña actual para autorizar los cambios."
+                                    })
+                                if not self.instance.check_password(password_actual):
+                                    raise serializers.ValidationError({
+                                        "password_actual": "Contraseña actual incorrecta."
+                                    })
 
-                if not es_admin:
-                    if not password_actual:
-                        raise serializers.ValidationError({
-                            "password_actual": "Debes ingresar tu contraseña actual para autorizar los cambios."
-                        })
-                    if not self.instance.check_password(password_actual):
-                        raise serializers.ValidationError({
-                            "password_actual": "Contraseña actual incorrecta."
-                        })
-
-       
-        data.pop('confirm_password', None)
         
+        data.pop('confirm_password', None)
+            
         return data
     
     def update(self, instance, validated_data):
