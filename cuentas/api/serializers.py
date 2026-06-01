@@ -105,7 +105,6 @@ class UsuarioSerializer(serializers.ModelSerializer):
                     es_admin = request_user.is_superuser or (request_user.id_rol and request_user.id_rol.nombre_rol == 'Administrador')
                     es_su_propio_perfil = (self.instance == request_user)
 
-                    # 1. Validación de contraseña actual
                     if not es_admin or es_su_propio_perfil:
                         if not password_actual:
                             raise serializers.ValidationError({
@@ -116,15 +115,12 @@ class UsuarioSerializer(serializers.ModelSerializer):
                                 "password_actual": "Contraseña actual incorrecta."
                             })
 
-                    # 2. Candado Jerárquico
                     if not es_su_propio_perfil:
-                        # Protegemos al Súper Admin de los admins normales
                         if self.instance.is_superuser and not request_user.is_superuser:
                             raise serializers.ValidationError({
                                 "detail": "No tienes permisos para modificar a un Súper Administrador."
                             })
                         
-                        # Protegemos a los Admins entre sí
                         if self.instance.id_rol and self.instance.id_rol.nombre_rol == 'Administrador' and not request_user.is_superuser:
                             raise serializers.ValidationError({
                                 "detail": "Un Administrador no puede cambiar la contraseña de otro Administrador."
@@ -134,16 +130,26 @@ class UsuarioSerializer(serializers.ModelSerializer):
             return data
     
     def update(self, instance, validated_data):
-            validated_data.pop('id_rol', None)
-            validated_data.pop('estatus', None)
+            request_user = self.context['request'].user
+            es_admin = request_user.is_superuser or (request_user.id_rol and request_user.id_rol.nombre_rol == 'Administrador')
+
+            #evalua si es admin para evitar cambiar su propio rol
+            if not es_admin:
+                validated_data.pop('id_rol', None)
+                validated_data.pop('estatus', None)
+
+            #limpieza de pass
             validated_data.pop('confirm_password', None)
             validated_data.pop('password_actual', None)
+            
             password = validated_data.pop('password', None)
 
+            #encripta la contraseña nueva
             if password:
                 instance.set_password(password)
                 instance.save() 
                 
+            #actualizacion de campos
             return super().update(instance, validated_data)
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
