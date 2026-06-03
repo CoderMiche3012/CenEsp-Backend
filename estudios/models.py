@@ -5,14 +5,11 @@ from django.db import models
 
 class EstudioSocioeconomico(models.Model):
     id_estudio = models.AutoField(primary_key=True)
-    # La conexión al niño
-    id_expediente = models.ForeignKey('beneficiarios.Expediente', on_delete=models.CASCADE)
     id_expediente = models.ForeignKey(
         'beneficiarios.Expediente', 
         on_delete=models.CASCADE,
         db_column='id_expediente'
     )
-    # Campos directos de la tabla según tu imagen
     nivel_escolar_inicial = models.CharField(max_length=100)
     grado_escolar_inicial = models.CharField(max_length=100)
     referencia_ingreso = models.TextField(null=True, blank=True)
@@ -33,6 +30,24 @@ class Analisis(models.Model):
     class Meta:
         db_table = 'analisis'
 
+class Gasto(models.Model):
+    id_gasto = models.AutoField(primary_key=True)
+    nombre = models.CharField(max_length=100)
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+
+    id_estudiosocioeconomico = models.ForeignKey(
+        'EstudioSocioeconomico', 
+        on_delete=models.CASCADE, 
+        related_name='gastos',
+        db_column='id_estudiosocioeconomico'
+    )
+
+    class Meta:
+        db_table = 'gasto'
+        verbose_name_plural = 'Gastos'
+
+    def __str__(self):
+        return f"{self.nombre} - ${self.monto}"
 
 class Familia(models.Model):
     id_familia = models.AutoField(primary_key=True)
@@ -41,7 +56,6 @@ class Familia(models.Model):
     apellido_m = models.CharField(max_length=25, null=True, blank=True)
     parentesco = models.CharField(max_length=50)
     fecha_nacimiento = models.DateField(null=True, blank=True) 
-    
     actividad_principal = models.CharField(max_length=100)
     salario = models.CharField(max_length=100, null=True, blank=True)
     vive_en_casa = models.BooleanField(default=True)
@@ -49,7 +63,7 @@ class Familia(models.Model):
     es_tutor_principal = models.BooleanField(default=False)
     
     id_expediente = models.ForeignKey(
-        'beneficiarios.Expediente', #busca ruta de expediente
+        'beneficiarios.Expediente', 
         on_delete=models.CASCADE, 
         db_column='id_expediente',
         related_name='familiares'

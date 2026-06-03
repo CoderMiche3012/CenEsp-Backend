@@ -75,6 +75,7 @@ class Expediente(models.Model):
 class Postulante(models.Model):
     id_postulante = models.AutoField(primary_key=True)
     estatus = models.CharField(max_length=50, default='Pendiente')
+    fecha_ingreso = models.DateField(auto_now_add=True)
     id_expediente = models.ForeignKey(
         Expediente, 
         on_delete=models.CASCADE,
@@ -123,6 +124,7 @@ class Beneficiario(models.Model):
     id_beneficiario = models.AutoField(primary_key=True)
     notas = models.TextField(null=True, blank=True)
     fecha_ingreso = models.DateField(auto_now_add=True)
+    estatus = models.CharField(max_length=50, default='Activo')
     
     id_expediente = models.ForeignKey(
         Expediente, 

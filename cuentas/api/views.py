@@ -18,6 +18,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
     permission_classes = [IsAuthenticated, TienePermisoModulo]
+    modulo_permiso = 'usuarios'
 
 class RolViewSet(viewsets.ModelViewSet):
     queryset = Rol.objects.all()

@@ -1,8 +1,9 @@
 import os
+from django.db import transaction
 from rest_framework import serializers
 from django.core.validators import RegexValidator
 from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales, Geografia
-from estudios.models import Familia
+from estudios.models import Familia, EstudioSocioeconomico, Gasto
 from estudios.api.serializers import FamiliaSerializer
 from escolaridad.api.serializers import DatosEscolaresSerializer
 from django.db.models import Count
@@ -64,14 +65,13 @@ class FotografiasSerializer(serializers.ModelSerializer):
         return value
 
 class DocumentosPersonalesSerializer(serializers.ModelSerializer):
-    # Inyectamos tus validadores regex directamente en los campos
     nombre_documento = serializers.CharField(
         max_length=100, 
         validators=[alfanumerico_regex]
     )
     tipo_documento = serializers.CharField(
         max_length=100, 
-        validators=[alfanumerico_regex] # O letras_regex, el que prefieras
+        validators=[alfanumerico_regex] 
     )
 
     class Meta:
@@ -177,7 +177,122 @@ class VisitaPostulanteSerializer(serializers.ModelSerializer):
         model = Visita_Postulante
         fields = '__all__'
 
-#Sprint 4 
+class RegistroPostulanteSerializer(serializers.ModelSerializer):
+    expediente = serializers.DictField(write_only=True)
+    estudio = serializers.DictField(write_only=True)
+    familia = serializers.ListField(child=serializers.DictField(), write_only=True)
+
+    class Meta:
+        model = Postulante
+        fields = ['estatus', 'expediente', 'estudio', 'familia']
+
+    #si falla no guardara nada en la base de datos
+    @transaction.atomic
+    def create(self, validated_data):
+        expediente_data = validated_data.pop('expediente')
+        estudio_data = validated_data.pop('estudio')
+        familia_data = validated_data.pop('familia')
+
+        request_user = self.context['request'].user
+
+        direccion_data = expediente_data.pop('direccion', None)
+        direccion_obj = None
+        
+        if direccion_data:
+            id_geografia = direccion_data.pop('id_geografia', None)
+            
+            if id_geografia:
+                geografia_obj = Geografia.objects.get(pk=id_geografia)
+            else:
+                cp = direccion_data.pop('codigo_postal')
+                colonia = direccion_data.pop('colonia')
+                municipio = direccion_data.pop('municipio')
+                
+                geografia_obj, _ = Geografia.objects.get_or_create(
+                    codigo_postal=cp,
+                    colonia=colonia,
+                    defaults={'municipio': municipio, 'estado': 'Oaxaca'}
+                )
+
+            direccion_obj = Direccion.objects.create(
+                id_geografia=geografia_obj,
+                **direccion_data
+            )
+
+        expediente_obj = Expediente.objects.create(
+            id_direccion=direccion_obj,
+            **expediente_data
+        )
+
+        gastos_data = estudio_data.pop('gastos', [])
+        estudio_obj = EstudioSocioeconomico.objects.create(
+            id_expediente=expediente_obj,
+            **estudio_data
+        )
+
+        for gasto in gastos_data:
+            Gasto.objects.create(id_estudiosocioeconomico=estudio_obj, **gasto)
+
+        for integrante in familia_data:
+            Familia.objects.create(id_expediente=expediente_obj, **integrante)
+
+        estatus_inicial = validated_data.get('estatus', 'Pendiente')
+        postulante_obj = Postulante.objects.create(
+            id_expediente=expediente_obj,
+            id_usuario=request_user,
+            estatus=estatus_inicial
+        )
+
+        return postulante_obj
+
+class EdicionPostulanteSerializer(serializers.ModelSerializer):
+    expediente = serializers.DictField(write_only=True, required=False)
+    estudio = serializers.DictField(write_only=True, required=False)
+
+    class Meta:
+        model = Postulante
+        fields = ['expediente', 'estudio']
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        expediente_data = validated_data.pop('expediente', None)
+        estudio_data = validated_data.pop('estudio', None)
+
+        if expediente_data:
+            expediente_obj = instance.id_expediente
+            direccion_data = expediente_data.pop('direccion', None)
+
+            if direccion_data and expediente_obj.id_direccion:
+                direccion_obj = expediente_obj.id_direccion
+                cp = direccion_data.pop('codigo_postal', None)
+                colonia = direccion_data.pop('colonia', None)
+                municipio = direccion_data.pop('municipio', None)
+
+                if cp and colonia:
+                    geografia_obj, _ = Geografia.objects.get_or_create(
+                        codigo_postal=cp,
+                        colonia=colonia,
+                        defaults={'municipio': municipio, 'estado': 'Oaxaca'}
+                    )
+                    direccion_obj.id_geografia = geografia_obj
+
+                for attr, value in direccion_data.items():
+                    setattr(direccion_obj, attr, value)
+                direccion_obj.save()
+
+            for attr, value in expediente_data.items():
+                setattr(expediente_obj, attr, value)
+            expediente_obj.save()
+
+        if estudio_data:
+            estudio_obj = EstudioSocioeconomico.objects.filter(id_expediente=instance.id_expediente).first()
+            if estudio_obj:
+                for attr, value in estudio_data.items():
+                    setattr(estudio_obj, attr, value)
+                estudio_obj.save()
+
+        return instance
+
 
 class ApoyoEconomicoSerializer(serializers.ModelSerializer):
     concepto = serializers.CharField(validators=[alfanumerico_regex])
@@ -187,7 +302,6 @@ class ApoyoEconomicoSerializer(serializers.ModelSerializer):
         model = ApoyoEconomico
         fields = '__all__'
 
-    # Validación financiera: Evitar montos en $0 o negativos
     def validate_monto(self, value):
         if value <= 0:
             raise serializers.ValidationError("El monto del apoyo económico debe ser mayor a cero.")
@@ -208,9 +322,7 @@ class ObligacionSerializer(serializers.ModelSerializer):
         model = Obligacion
         fields = '__all__'
 
-# mandare todo el paquete de datos en un solo json anidado para el seguimiento del beneficairio
 class SeguimientoBeneficiarioSerializer(serializers.ModelSerializer):
-    # Traemos los datos escolares (y sus boletas anidadas)
     datos_escolares = DatosEscolaresSerializer(read_only=True)
     apoyos_economicos = ApoyoEconomicoSerializer(many=True, read_only=True)
     usos_servicios = UsoServiciosSerializer(many=True, read_only=True)
@@ -222,13 +334,36 @@ class SeguimientoBeneficiarioSerializer(serializers.ModelSerializer):
 
 
 class BeneficiarioSerializer(serializers.ModelSerializer):
+    expediente_resumen = serializers.SerializerMethodField()
+    donadores = serializers.SerializerMethodField()
+    historial_seguimientos = serializers.SerializerMethodField()
+
     class Meta:
         model = Beneficiario
-        fields = '__all__'
-        
-    def to_representation(self, instance):
-        response = super().to_representation(instance)
-        # Extraemos todos los seguimientos vinculados a este beneficiario
-        historial = instance.seguimientos.all() 
-        response['historial_seguimientos'] = SeguimientoBeneficiarioSerializer(historial, many=True).data
-        return response
+        fields = [
+            'id_beneficiario', 'estatus', 'fecha_ingreso', 'notas', 
+            'expediente_resumen', 'donadores', 'historial_seguimientos'
+        ]
+
+    def get_expediente_resumen(self, obj):
+        expediente = obj.id_expediente
+        direccion = expediente.id_direccion
+        municipio = None
+        if direccion and hasattr(direccion, 'id_geografia') and direccion.id_geografia:
+            municipio = direccion.id_geografia.municipio
+            
+        return {
+            "id_expediente": expediente.id_expediente,
+            "nombre_completo": f"{expediente.nombre} {expediente.apellido_p} {expediente.apellido_m or ''}".strip(),
+            "fecha_nacimiento": expediente.fecha_nacimiento,
+            "telefono": expediente.telefono,
+            "municipio": municipio
+        }
+
+    def get_donadores(self, obj):
+        padrinos = obj.padrinos.all()
+        return [{"id_donador": p.id_donador, "nombre": p.nombre} for p in padrinos]
+
+    def get_historial_seguimientos(self, obj):
+        seguimientos = SeguimientoBeneficiario.objects.filter(id_beneficiario=obj)
+        return SeguimientoBeneficiarioSerializer(seguimientos, many=True).data
