@@ -7,6 +7,7 @@ class Direccion(models.Model):
     calle = models.CharField(max_length=50)
     numero = models.CharField(max_length=5)
     localidad = models.CharField(max_length=100, null=True, blank=True)
+    pais = models.CharField(max_length=100, null=True, blank=True)
     
     id_geografia = models.ForeignKey(
         'Geografia',

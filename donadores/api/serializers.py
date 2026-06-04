@@ -57,23 +57,22 @@ class DonadorSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         domicilio_data = validated_data.pop('domicilio')
-        geografia_data = domicilio_data.pop('geografia', {})
         beneficiarios_data = validated_data.pop('beneficiarios_apoyados', [])
         
-        cp = geografia_data.get('codigo_postal')
-        localidad = geografia_data.get('localidad')
-        estado = geografia_data.get('estado', 'Oaxaca')
+        # 1. Buscamos el ID de geografía (Para donadores nacionales)
+        id_geografia = domicilio_data.get('id_geografia')
+        geografia_obj = None
+
+        if id_geografia:
+            geografia_obj = Geografia.objects.get(pk=id_geografia)
         
-        geografia_obj, _ = Geografia.objects.get_or_create(
-            codigo_postal=cp,
-            colonia=localidad,
-            defaults={'estado': estado, 'municipio': localidad}
-        )
-        
+        # 2. Creamos la dirección atrapando TODOS los datos (vital para los internacionales)
         direccion = Direccion.objects.create(
             calle=domicilio_data.get('calle'),
             numero=domicilio_data.get('numero_exterior', domicilio_data.get('numero')),
-            id_geografia=geografia_obj
+            localidad=domicilio_data.get('localidad'), # 👈 Atrapa la ciudad extranjera
+            pais=domicilio_data.get('pais'),           # 👈 Atrapa el país extranjero
+            id_geografia=geografia_obj                 # 👈 Atrapa la colonia nacional
         )
         
         donador = Donador.objects.create(domicilio=direccion, **validated_data)
@@ -118,7 +117,6 @@ class DonadorSerializer(serializers.ModelSerializer):
                 })
                 
             representacion['beneficiarios_apoyados'] = beneficiarios_data
-
             if instance.domicilio:
                 direccion = instance.domicilio
                 geografia = direccion.id_geografia
@@ -128,14 +126,13 @@ class DonadorSerializer(serializers.ModelSerializer):
                     "numero_exterior": direccion.numero,
                     "geografia": {
                         "codigo_postal": geografia.codigo_postal if geografia else None,
-                        "estado": geografia.estado if geografia else "Oaxaca",
+                        "estado": geografia.estado if geografia else None,
                         "localidad": direccion.localidad if direccion.localidad else (geografia.municipio if geografia else None),
                         "pais_codigo": direccion.pais if direccion.pais else "MX"
                     }
                 }
             else:
                 representacion['domicilio'] = None
-            representacion.pop('domicilio_detalle', None)
             
             return representacion
         
