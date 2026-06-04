@@ -33,9 +33,7 @@ class DonadorSerializer(serializers.ModelSerializer):
     apellido_materno = serializers.CharField(validators=[letras_regex], required=False, allow_blank=True, allow_null=True)
     telefono = serializers.CharField(validators=[telefono_regex], required=False, allow_blank=True, allow_null=True)
     
-    # Recibe el JSON anidado desde el Frontend
     domicilio = serializers.DictField(write_only=True)
-    # Devuelve la dirección bonita en los GET
     domicilio_detalle = DireccionSerializer(source='domicilio', read_only=True) 
 
     beneficiarios_apoyados = serializers.PrimaryKeyRelatedField(
@@ -63,7 +61,6 @@ class DonadorSerializer(serializers.ModelSerializer):
         geografia_data = domicilio_data.pop('geografia', {})
         beneficiarios_data = validated_data.pop('beneficiarios_apoyados', [])
         
-        # 1. Resolver Geografía (Buscar o Crear)
         cp = geografia_data.get('codigo_postal')
         localidad = geografia_data.get('localidad')
         estado = geografia_data.get('estado', 'Oaxaca')
@@ -74,14 +71,12 @@ class DonadorSerializer(serializers.ModelSerializer):
             defaults={'estado': estado, 'municipio': localidad}
         )
         
-        # 2. Crear Dirección (Tu documento pide "numero_exterior", tu modelo "numero")
         direccion = Direccion.objects.create(
             calle=domicilio_data.get('calle'),
             numero=domicilio_data.get('numero_exterior', domicilio_data.get('numero')),
             id_geografia=geografia_obj
         )
         
-        # 3. Crear Donador
         donador = Donador.objects.create(domicilio=direccion, **validated_data)
         
         if beneficiarios_data:
@@ -108,39 +103,59 @@ class DonadorSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
-
     def to_representation(self, instance):
-            response = super().to_representation(instance)
-            beneficiarios = []
-            for b in instance.beneficiarios_apoyados.all():
-                beneficiarios.append({
-                    "id": b.id_beneficiario,
-                    "nombre": f"{b.id_expediente.nombre} {b.id_expediente.apellido_p}",
-                    "fecha_nacimiento": b.id_expediente.fecha_nacimiento,
-                    "estatus": b.estatus
+            representacion = super().to_representation(instance)
+        
+            beneficiarios_data = []
+            for beneficiario in instance.beneficiarios_apoyados.all():
+                exp = beneficiario.id_expediente
+                nombre_completo = f"{exp.nombre} {exp.apellido_p} {exp.apellido_m or ''}".strip()
+                
+                beneficiarios_data.append({
+                    "id": beneficiario.id_beneficiario,
+                    "nombre": nombre_completo,
+                    "fecha_nacimiento": exp.fecha_nacimiento.strftime('%Y-%m-%d') if exp.fecha_nacimiento else None,
+                    "estatus": beneficiario.estatus
                 })
-            response['beneficiarios_apoyados'] = beneficiarios
-            return response
-    
+                
+            representacion['beneficiarios_apoyados'] = beneficiarios_data
+
+            if instance.domicilio:
+                direccion = instance.domicilio
+                geografia = direccion.id_geografia
+                
+                representacion['domicilio'] = {
+                    "calle": direccion.calle,
+                    "numero_exterior": direccion.numero,
+                    "geografia": {
+                        "codigo_postal": geografia.codigo_postal if geografia else None,
+                        "estado": geografia.estado if geografia else "Oaxaca",
+                        "localidad": direccion.localidad if direccion.localidad else (geografia.municipio if geografia else None),
+                        "pais_codigo": direccion.pais if direccion.pais else "MX"
+                    }
+                }
+            else:
+                representacion['domicilio'] = None
+            representacion.pop('domicilio_detalle', None)
+            
+            return representacion
+        
 
 class DonativoDonadorSerializer(serializers.ModelSerializer):
     class Meta:
         model = DonativoDonador
         fields = '__all__'
 
-    # Regla: Monto mayor a 0
     def validate_monto(self, value):
         if value <= 0:
             raise serializers.ValidationError("El monto del donativo debe ser mayor a cero.")
         return value
 
-    # Regla: Fecha no mayor a hoy
     def validate_fecha(self, value):
         if value > timezone.now().date():
             raise serializers.ValidationError("La fecha del donativo no puede estar en el futuro.")
         return value
 
-    # Regla: Donador no puede estar inactivo
     def validate(self, data):
         donador = data.get('id_donador')
         if donador and donador.estatus != 'Activo':
