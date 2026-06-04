@@ -57,22 +57,30 @@ class DonadorSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         domicilio_data = validated_data.pop('domicilio')
+        geografia_data = domicilio_data.pop('geografia') # Extraemos el bloque completo[cite: 5]
         beneficiarios_data = validated_data.pop('beneficiarios_apoyados', [])
         
-        # 1. Buscamos el ID de geografía (Para donadores nacionales)
-        id_geografia = domicilio_data.get('id_geografia')
-        geografia_obj = None
-
-        if id_geografia:
-            geografia_obj = Geografia.objects.get(pk=id_geografia)
+        id_geografia = geografia_data.get('id_geografia')
         
-        # 2. Creamos la dirección atrapando TODOS los datos (vital para los internacionales)
+        # ¿El formulario viene con un id_geografia?[cite: 5]
+        if id_geografia:
+            # Usa el ID existente[cite: 5]
+            geografia_obj = Geografia.objects.get(pk=id_geografia)
+        else:
+            # Hace el INSERT en caliente y crea el id_geografia[cite: 5]
+            geografia_obj = Geografia.objects.create(
+                codigo_postal=geografia_data.get('codigo_postal'),
+                municipio=geografia_data.get('municipio'),
+                colonia=geografia_data.get('colonia'),
+                estado=geografia_data.get('estado'),
+                pais=geografia_data.get('pais', 'MX')
+            )
+        
+        # Ya no guardamos país ni localidad aquí, todo vive en Geografía[cite: 5]
         direccion = Direccion.objects.create(
             calle=domicilio_data.get('calle'),
             numero=domicilio_data.get('numero_exterior', domicilio_data.get('numero')),
-            localidad=domicilio_data.get('localidad'), # 👈 Atrapa la ciudad extranjera
-            pais=domicilio_data.get('pais'),           # 👈 Atrapa el país extranjero
-            id_geografia=geografia_obj                 # 👈 Atrapa la colonia nacional
+            id_geografia=geografia_obj
         )
         
         donador = Donador.objects.create(domicilio=direccion, **validated_data)

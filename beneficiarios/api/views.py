@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
+from rest_framework.views import APIView
 from periodos.models import Periodo
 from beneficiarios.models import (Direccion, Expediente, Postulante, Visita_Postulante, 
                                   Beneficiario, Fotografias, SeguimientoBeneficiario, 
@@ -18,40 +19,68 @@ from .serializers import (DireccionSerializer, ExpedienteSerializer, PostulanteS
                           ApoyoEconomicoSerializer, UsoServiciosSerializer, 
                           ObligacionSerializer, DocumentosPersonalesSerializer, GeografiaSerializer)
 
+
 class GeografiaViewSet(viewsets.ModelViewSet):
     queryset = Geografia.objects.all()
     serializer_class = GeografiaSerializer
-    permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
-        cp = request.query_params.get('codigo_postal') 
+        cp = request.query_params.get('cp')
+        pais = request.query_params.get('pais', 'MX')
         if not cp:
             return super().list(request, *args, **kwargs)
 
-        resultados = Geografia.objects.filter(codigo_postal=cp)
+        opciones_temporales = []
+        estado_info = ""
+        municipio_info = ""
 
-        if not resultados.exists():
-            url = f"http://api.zippopotam.us/MX/{cp}" 
-            try:
-                respuesta_zippopotam = requests.get(url, timeout=5)
-                if respuesta_zippopotam.status_code == 200:
-                    datos = respuesta_zippopotam.json()
-                    estado = datos['places'][0]['state']
-                    
-                    for place in datos['places']:
-                        colonia = place['place name']
-                        municipio = place.get('admin name2', '') 
-                        
-                        Geografia.objects.get_or_create(
-                            codigo_postal=cp,
-                            colonia=colonia,
-                            defaults={'estado': estado, 'municipio': municipio}
-                        )
-                    resultados = Geografia.objects.filter(codigo_postal=cp)
-            except requests.RequestException:
-                pass
-        serializer = self.get_serializer(resultados, many=True)
-        return Response(serializer.data)
+        if pais == 'MX' and (cp.startswith('68') or cp.startswith('71')):
+            #lee el json local de oaxaca
+            estado_info = "Oaxaca"
+            municipio_info = "Oaxaca de Juárez" 
+            opciones_temporales = [{"nombre": "Centro"}, {"nombre": "La Soledad"}] 
+        else:
+            url = f"https://api.zippopotam.us/{pais.lower()}/{cp}"
+            response = requests.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                estado_info = data.get('places', [{}])[0].get('state', '')
+   
+                for place in data.get('places', []):
+                    opciones_temporales.append({"nombre": place.get('place name')})
+
+        opciones_finales = []
+        
+        for opcion in opciones_temporales:
+            nombre_lugar = opcion['nombre']
+            #compara existencia en la bd
+            geografia_existente = Geografia.objects.filter(
+                codigo_postal=cp, 
+                pais=pais,
+                colonia=nombre_lugar if pais == 'MX' else None,
+                municipio=nombre_lugar if pais != 'MX' else municipio_info
+            ).first()
+
+            if geografia_existente:
+                opciones_finales.append({
+                    "id_geografia": geografia_existente.id_geografia,
+                    "nombre": nombre_lugar
+                })
+            else:
+                opciones_finales.append({
+                    "id_geografia": None,
+                    "nombre": nombre_lugar
+                })
+
+        return Response({
+            "codigo_postal": cp,
+            "pais": pais,
+            "estado": estado_info,
+            "municipio": municipio_info if pais == 'MX' else None,
+            "colonia": None if pais != 'MX' else "", 
+            "opciones": opciones_finales
+        })
 
 class DireccionViewSet(viewsets.ModelViewSet):
     queryset = Direccion.objects.all()
@@ -97,20 +126,17 @@ class PostulanteViewSet(viewsets.ModelViewSet):
             "expediente_actualizado": "expediente" in request.data,
             "estudio_actualizado": "estudio" in request.data
         }, status=status.HTTP_200_OK)
-    #ACEPTAR AL POSTULANTE 
+
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def aceptar(self, request, pk=None):
-        # Obtenemos al postulante por su ID (el que viene en la URL)
         postulante = self.get_object()
 
-        # 1. Evitamos dobles aceptaciones
         if postulante.estatus == 'Aceptado':
             return Response({
                 "error": "Este postulante ya ha sido aceptado anteriormente."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Validar que exista un Período Activo (Usamos tu campo estado=True)
         periodo_activo = Periodo.objects.filter(estado=True).first() 
         
         if not periodo_activo:
@@ -118,18 +144,13 @@ class PostulanteViewSet(viewsets.ModelViewSet):
                 "error": "No existe un período activo. No se puede crear el seguimiento del beneficiario."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # 3. Cambiar estatus del Postulante
         postulante.estatus = 'Aceptado'
         postulante.save()
-
-        # 4. Crear el nuevo Beneficiario apuntando al mismo Expediente
-        # (Asumo que tu Beneficiario también tiene un campo estatus de tipo CharField)
         beneficiario = Beneficiario.objects.create(
             id_expediente=postulante.id_expediente,
             estatus='Activo' 
         )
 
-        # 5. Crear el Seguimiento Inicial enlazado al Periodo
         SeguimientoBeneficiario.objects.create(
             id_beneficiario=beneficiario,
             id_periodo=periodo_activo
@@ -154,7 +175,6 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def activos(self, request):
-        # Traemos solo a los que tienen estatus 'Activo'
         activos = Beneficiario.objects.filter(estatus='Activo')
         serializer = self.get_serializer(activos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -235,3 +255,63 @@ class SeguimientoBeneficiarioViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(id_periodo=periodo_id)
 
         return queryset
+
+#DEPURACION - PEDIENTE A ELIMINAR
+class GeografiaConsultaView(APIView):
+    def get(self, request):
+        cp = request.query_params.get('cp')
+        pais = request.query_params.get('pais', 'MX')
+        
+        if not cp:
+            return Response({"error": "El parámetro cp es obligatorio."}, status=400)
+
+        opciones_temporales = []
+        estado_info = ""
+        municipio_info = ""
+
+        if pais == 'MX' and (cp.startswith('68') or cp.startswith('71')):
+            estado_info = "Oaxaca"
+            municipio_info = "Oaxaca de Juárez" # O el que venga en tu JSON
+            opciones_temporales = [{"nombre": "Centro"}, {"nombre": "La Soledad"}] # Extraído de tu JSON
+        else:
+            # NO es Oaxaca, hacemos fetch a Zippopotam
+            url = f"https://api.zippopotam.us/{pais.lower()}/{cp}"
+            response = requests.get(url)
+            
+            if response.status_code == 200:
+                data = response.json()
+                estado_info = data.get('places', [{}])[0].get('state', '')
+                # Para el extranjero, mapeamos 'place name' a 'nombre'[cite: 5]
+                for place in data.get('places', []):
+                    opciones_temporales.append({"nombre": place.get('place name')})
+        opciones_finales = []
+        
+        for opcion in opciones_temporales:
+            nombre_lugar = opcion['nombre']
+            
+            geografia_existente = Geografia.objects.filter(
+                codigo_postal=cp, 
+                pais=pais,
+                colonia=nombre_lugar if pais == 'MX' else None,
+                municipio=nombre_lugar if pais != 'MX' else municipio_info
+            ).first()
+
+            if geografia_existente:
+                opciones_finales.append({
+                    "id_geografia": geografia_existente.id_geografia,
+                    "nombre": nombre_lugar
+                })
+            else:
+                opciones_finales.append({
+                    "id_geografia": None,
+                    "nombre": nombre_lugar
+                })
+
+        return Response({
+            "codigo_postal": cp,
+            "pais": pais,
+            "estado": estado_info,
+            "municipio": municipio_info if pais == 'MX' else None,
+            "colonia": None if pais != 'MX' else "", 
+            "opciones": opciones_finales
+        })

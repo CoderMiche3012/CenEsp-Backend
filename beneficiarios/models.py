@@ -25,9 +25,9 @@ class Direccion(models.Model):
 class Geografia(models.Model):
     id_geografia = models.AutoField(primary_key=True)
     codigo_postal = models.CharField(max_length=10)
-    municipio = models.CharField(max_length=150)
-    colonia = models.CharField(max_length=150)
-    estado = models.CharField(max_length=100, null=True, blank=True) # Opcional, pero útil
+    municipio = models.CharField(max_length=150, null=True, blank=True)
+    colonia = models.CharField(max_length=150, null=True, blank=True)
+    estado = models.CharField(max_length=100, null=True, blank=True) 
     pais = models.CharField(max_length=100, default='MX', null=True, blank=True)
    
     class Meta:
