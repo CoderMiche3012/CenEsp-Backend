@@ -57,17 +57,14 @@ class DonadorSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         domicilio_data = validated_data.pop('domicilio')
-        geografia_data = domicilio_data.pop('geografia') # Extraemos el bloque completo[cite: 5]
+        geografia_data = domicilio_data.pop('geografia') 
         beneficiarios_data = validated_data.pop('beneficiarios_apoyados', [])
         
         id_geografia = geografia_data.get('id_geografia')
         
-        # ¿El formulario viene con un id_geografia?[cite: 5]
         if id_geografia:
-            # Usa el ID existente[cite: 5]
             geografia_obj = Geografia.objects.get(pk=id_geografia)
         else:
-            # Hace el INSERT en caliente y crea el id_geografia[cite: 5]
             geografia_obj = Geografia.objects.create(
                 codigo_postal=geografia_data.get('codigo_postal'),
                 municipio=geografia_data.get('municipio'),
@@ -76,7 +73,6 @@ class DonadorSerializer(serializers.ModelSerializer):
                 pais=geografia_data.get('pais', 'MX')
             )
         
-        # Ya no guardamos país ni localidad aquí, todo vive en Geografía[cite: 5]
         direccion = Direccion.objects.create(
             calle=domicilio_data.get('calle'),
             numero=domicilio_data.get('numero_exterior', domicilio_data.get('numero')),
@@ -92,13 +88,32 @@ class DonadorSerializer(serializers.ModelSerializer):
     
     @transaction.atomic
     def update(self, instance, validated_data):
-        direccion_data = validated_data.pop('domicilio', None)
+        domicilio_data = validated_data.pop('domicilio', None)
         beneficiarios_data = validated_data.pop('beneficiarios_apoyados', None)
 
-        if direccion_data and instance.domicilio:
+        if domicilio_data and instance.domicilio:
             direccion = instance.domicilio
-            for attr, value in direccion_data.items():
-                setattr(direccion, attr, value)
+            
+            geografia_data = domicilio_data.pop('geografia', None)
+            
+            if geografia_data:
+                id_geografia = geografia_data.get('id_geografia')
+                
+                if id_geografia:
+                    geografia_obj = Geografia.objects.get(pk=id_geografia)
+                else:
+                    geografia_obj = Geografia.objects.create(
+                        codigo_postal=geografia_data.get('codigo_postal'),
+                        municipio=geografia_data.get('municipio'),
+                        colonia=geografia_data.get('colonia'),
+                        estado=geografia_data.get('estado'),
+                        pais=geografia_data.get('pais', 'MX')
+                    )
+
+                direccion.id_geografia = geografia_obj
+
+            direccion.calle = domicilio_data.get('calle', direccion.calle)
+            direccion.numero = domicilio_data.get('numero_exterior', domicilio_data.get('numero', direccion.numero))
             direccion.save()
 
         if beneficiarios_data is not None:
@@ -109,6 +124,7 @@ class DonadorSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
     def to_representation(self, instance):
             representacion = super().to_representation(instance)
         
@@ -167,3 +183,17 @@ class DonativoDonadorSerializer(serializers.ModelSerializer):
                 "id_donador": "No se pueden registrar donativos para un donador inactivo."
             })
         return data
+    
+    def to_representation(self, instance):
+        donador = instance.id_donador
+        apellido = f" {donador.apellido_paterno}" if donador.apellido_paterno else ""
+        nombre_completo = f"{donador.nombre}{apellido}".strip()
+
+        return {
+            "id_donativo": instance.id_donativo,
+            "id_donador": donador.id_donador,
+            "nombre_donador": nombre_completo,
+            "concepto": instance.concepto,
+            "monto": float(instance.monto), 
+            "moneda": instance.moneda
+        }

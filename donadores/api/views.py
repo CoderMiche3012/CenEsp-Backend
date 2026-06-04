@@ -16,6 +16,18 @@ class DonativoDonadorViewSet(viewsets.ModelViewSet):
     serializer_class = DonativoDonadorSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        id_donador = self.request.query_params.get('id_donador')
+        id_periodo = self.request.query_params.get('id_periodo')
+
+        if id_donador:
+            queryset = queryset.filter(id_donador=id_donador)
+        if id_periodo:
+            queryset = queryset.filter(id_periodo=id_periodo)
+
+        return queryset
+
     @action(detail=False, methods=['get'], url_path='periodo-activo')
     def periodo_activo(self, request):
         periodo = Periodo.objects.filter(estado=True).first()
@@ -23,6 +35,16 @@ class DonativoDonadorViewSet(viewsets.ModelViewSet):
             return Response({"error": "No hay un periodo activo en el sistema."}, status=status.HTTP_400_BAD_REQUEST)
         
         donativos = self.queryset.filter(id_periodo=periodo)
+        serializer = self.get_serializer(donativos, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='por-donador')
+    def por_donador(self, request):
+        id_donador = request.query_params.get('id_donador')
+        if not id_donador:
+            return Response({"error": "Se requiere el parámetro id_donador."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        donativos = self.queryset.filter(id_donador=id_donador)
         serializer = self.get_serializer(donativos, many=True)
         return Response(serializer.data)
 
@@ -34,27 +56,68 @@ class DonativoDonadorViewSet(viewsets.ModelViewSet):
         
         donativos = self.queryset.filter(id_periodo=id_periodo)
         
-        if not donativos.exists():
+        #cantidad total de donativos 
+        cantidad_donativos = donativos.count()
+        
+        if cantidad_donativos == 0:
             return Response({
-                "total_donativos": 0, "moneda": "MXN", 
-                "cantidad_donativos": 0, "promedio": 0
+                "cantidad_donativos": 0, 
+                "resumen_monedas": []
             }, status=status.HTTP_200_OK)
 
-        stats = donativos.aggregate(
-            total=Sum('monto'),
-            cantidad=Count('id_donativo'),
-            promedio=Avg('monto')
-        )
+        #agrupacion de monedas
+        totales_bd = donativos.values('moneda').annotate(total=Sum('monto'))
+        
+        resumen_monedas = []
+        for item in totales_bd:
+            resumen_monedas.append({
+                "moneda": item['moneda'],
+                "total": float(item['total'])
+            })
         
         return Response({
-            "total_donativos": float(stats['total']),
-            "moneda": "MXN",
-            "cantidad_donativos": stats['cantidad'],
-            "promedio": round(float(stats['promedio']), 2) if stats['promedio'] else 0
+            "cantidad_donativos": cantidad_donativos,
+            "resumen_monedas": resumen_monedas
         }, status=status.HTTP_200_OK)
-
+    
 class DonadorViewSet(viewsets.ModelViewSet):
     queryset = Donador.objects.all()
     serializer_class = DonadorSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['get'], url_path='periodos-donativos')
+    def periodos_donativos(self, request, pk=None):
+        donador = self.get_object()
+        fecha_ingreso = donador.fecha_ingreso
+
+        periodos_validos = Periodo.objects.filter(
+            fecha_fin__gte=fecha_ingreso
+        ).order_by('fecha_inicio')
+
+        resultado = []
+
+        for periodo in periodos_validos:
+            donativos_periodo = DonativoDonador.objects.filter(
+                id_donador=donador,
+                id_periodo=periodo
+            )
+
+            total_cantidad = donativos_periodo.count()
+            
+            #moneda por periodo
+            totales_bd = donativos_periodo.values('moneda').annotate(total=Sum('monto'))
+            
+            totales_dict = {}
+            for item in totales_bd:
+                totales_dict[item['moneda']] = float(item['total'])
+
+            resultado.append({
+                "id_periodo": periodo.id_periodo, # Verifica que se llame id_periodo en tu modelo Periodo
+                "fecha_inicio": periodo.fecha_inicio.strftime('%Y-%m-%d') if periodo.fecha_inicio else None,
+                "fecha_fin": periodo.fecha_fin.strftime('%Y-%m-%d') if periodo.fecha_fin else None,
+                "total_donativos": total_cantidad,
+                "totales": totales_dict
+            })
+
+        return Response(resultado)
 
