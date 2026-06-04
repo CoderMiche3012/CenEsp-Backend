@@ -7,7 +7,6 @@ class Direccion(models.Model):
     calle = models.CharField(max_length=50)
     numero = models.CharField(max_length=5)
     localidad = models.CharField(max_length=100, null=True, blank=True)
-    pais = models.CharField(max_length=100, null=True, blank=True)
     
     id_geografia = models.ForeignKey(
         'Geografia',
@@ -28,7 +27,8 @@ class Geografia(models.Model):
     municipio = models.CharField(max_length=150)
     colonia = models.CharField(max_length=150)
     estado = models.CharField(max_length=100, null=True, blank=True) # Opcional, pero útil
-
+    pais = models.CharField(max_length=100, default='MX', null=True, blank=True)
+   
     class Meta:
         db_table = 'geografia'
         verbose_name_plural = 'Geografías'
