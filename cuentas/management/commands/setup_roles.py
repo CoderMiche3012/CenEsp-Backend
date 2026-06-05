@@ -11,7 +11,7 @@ class Command(BaseCommand):
             'usuarios', 'roles', 'periodos', 'postulantes', 'familia', 
             'expedientes', 'estudios', 'visitas', 'beneficiarios', 'seguimientos', 
             'datos_escolares', 'donadores', 'donativos', 'apoyos', 'servicios', 
-            'obligaciones', 'reportes'
+            'obligaciones', 'reportes', 'direcciones'
         ]
         acciones_crud = ['ver', 'crear', 'editar', 'eliminar']
 

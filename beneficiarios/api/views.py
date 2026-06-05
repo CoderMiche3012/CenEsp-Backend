@@ -87,6 +87,17 @@ class DireccionViewSet(viewsets.ModelViewSet):
     serializer_class = DireccionSerializer
     permission_classes = [IsAuthenticated] 
 
+class PaisesCatalogoView(APIView):
+    def get(self, request):
+        paises_unicos = Geografia.objects.exclude(
+            pais__isnull=True
+        ).exclude(
+            pais__exact=""
+        ).values('pais').distinct().order_by('pais')
+        
+        
+        return Response(list(paises_unicos))
+
 class ExpedienteViewSet(viewsets.ModelViewSet):
     queryset = Expediente.objects.all()
     serializer_class = ExpedienteSerializer
