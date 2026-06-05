@@ -133,23 +133,19 @@ class UsuarioSerializer(serializers.ModelSerializer):
             request_user = self.context['request'].user
             es_admin = request_user.is_superuser or (request_user.id_rol and request_user.id_rol.nombre_rol == 'Administrador')
 
-            #evalua si es admin para evitar cambiar su propio rol
             if not es_admin:
                 validated_data.pop('id_rol', None)
                 validated_data.pop('estatus', None)
 
-            #limpieza de pass
             validated_data.pop('confirm_password', None)
             validated_data.pop('password_actual', None)
             
             password = validated_data.pop('password', None)
 
-            #encripta la contraseña nueva
             if password:
                 instance.set_password(password)
                 instance.save() 
                 
-            #actualizacion de campos
             return super().update(instance, validated_data)
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

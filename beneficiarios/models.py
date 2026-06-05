@@ -162,13 +162,9 @@ class Fotografias(models.Model):
 class DocumentosPersonales(models.Model):
     id_documento = models.AutoField(primary_key=True)
     nombre_documento = models.CharField(max_length=100) 
-    #acta, curp, comprbante, etc.
     tipo_documento = models.CharField(max_length=100) 
     fecha_carga = models.DateField(auto_now_add=True)
-    # FileField acepta cualquier archivo 
     archivo = models.FileField(upload_to='documentos_personales/%Y/%m/') 
-    
-    
 
     id_expediente = models.ForeignKey(
         'Expediente', 
@@ -187,7 +183,7 @@ class SeguimientoBeneficiario(models.Model):
     id_seguimiento = models.AutoField(primary_key=True)
     nota_seguimiento = models.TextField()
     estatus = models.CharField(max_length=20, default='Activo')
-    # fk a beneficiario
+
     id_beneficiario = models.ForeignKey(
         'Beneficiario', 
         on_delete=models.CASCADE, 
@@ -195,7 +191,6 @@ class SeguimientoBeneficiario(models.Model):
         db_column='id_beneficiario'
     )
     
-    # fk a periodo
     id_periodo = models.ForeignKey(
         Periodo, 
         on_delete=models.PROTECT, 
@@ -209,8 +204,6 @@ class SeguimientoBeneficiario(models.Model):
 
     def __str__(self):
         return f"Seguimiento {self.id_seguimiento} - {self.id_beneficiario.id_expediente.nombre}"
-    
-#tablas para el apoyo y obligaciones del beneficiario del SPRINT 4
 
 class ApoyoEconomico(models.Model):
     id_apoyo = models.AutoField(primary_key=True)

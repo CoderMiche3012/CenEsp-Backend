@@ -121,3 +121,41 @@ class DonadorViewSet(viewsets.ModelViewSet):
 
         return Response(resultado)
 
+    #REPORTES PARA TOTALES DE DONADORES POR PERIODOS 
+    @action(detail=False, methods=['get'], url_path='resumenTotales')
+    def resumen_totales(self, request):
+        id_periodo = request.query_params.get('id_periodo')
+        
+        if not id_periodo:
+            return Response({"error": "Se requiere el parámetro id_periodo."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        agrupado = DonativoDonador.objects.filter(
+            id_periodo=id_periodo
+        ).values(
+            'id_donador', 
+            'id_donador__tipo_donador', 
+            'moneda'
+        ).annotate(
+            total_monto=Sum('monto'),
+            cantidad=Count('id_donativo')
+        )
+
+        resumen = {}
+        
+        for item in agrupado:
+            donador_id = item['id_donador']
+            
+            if donador_id not in resumen:
+                resumen[donador_id] = {
+                    "id_donador": donador_id,
+                    "tipo": item['id_donador__tipo_donador'],
+                    "cantidad_donativos": 0,
+                    "totales": {}
+                }
+            
+            resumen[donador_id]["cantidad_donativos"] += item['cantidad']
+            
+            resumen[donador_id]["totales"][item['moneda']] = float(item['total_monto'])
+
+        return Response(list(resumen.values()), status=status.HTTP_200_OK)
+

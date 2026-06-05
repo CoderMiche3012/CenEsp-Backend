@@ -24,7 +24,6 @@ class Donador(models.Model):
     nota = models.TextField(null=True, blank=True)
     domicilio = models.ForeignKey(Direccion, on_delete=models.PROTECT, null=True)
 
-    # Tabla intermedia 
     beneficiarios_apoyados = models.ManyToManyField(
         Beneficiario, 
         related_name='padrinos',

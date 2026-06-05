@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
-# 1.Tabla de permiso
 class Permiso(models.Model):
     id_permiso = models.AutoField(primary_key=True)
     nombre_permiso = models.CharField(max_length=50, unique=True)
@@ -10,7 +9,6 @@ class Permiso(models.Model):
     def __str__(self):
         return self.nombre_permiso
 
-# 2.tabla de roles
 class Rol(models.Model):
     id_rol = models.AutoField(primary_key=True)
     nombre_rol = models.CharField(max_length=50, unique=True)
@@ -20,7 +18,6 @@ class Rol(models.Model):
     def __str__(self):
         return self.nombre_rol
 
-# 3.manejador de usuarios
 class UsuarioManager(BaseUserManager):
     def create_user(self, nom_usuario, correo, password=None, **extra_fields):
         if not correo:
@@ -39,7 +36,6 @@ class UsuarioManager(BaseUserManager):
         extra_fields.setdefault('is_superuser', True)
         return self.create_user(nom_usuario, correo, password, **extra_fields)
 
-# 4.modelo de usuarios
 class Usuario(AbstractBaseUser, PermissionsMixin):
     id_usuario = models.AutoField(primary_key=True)
     nom_usuario = models.CharField(max_length=20, unique=True) 
@@ -49,11 +45,9 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     correo = models.EmailField(unique=True)
     telefono = models.CharField(max_length=15, blank=True, null=True)
     estatus = models.BooleanField(default=True)
-
     id_rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, related_name='usuarios')
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False) 
-    #validación para bloqueo por intentos fallidos por inicio de sesion
     intentos_fallidos = models.IntegerField(default=0)
     bloqueado_hasta = models.DateTimeField(blank=True, null=True)
 
