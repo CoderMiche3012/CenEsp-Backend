@@ -195,5 +195,7 @@ class DonativoDonadorSerializer(serializers.ModelSerializer):
             "nombre_donador": nombre_completo,
             "concepto": instance.concepto,
             "monto": float(instance.monto), 
-            "moneda": instance.moneda
+            "moneda": instance.moneda,
+            
+            "periodo": str(instance.id_periodo_id) 
         }
