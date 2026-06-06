@@ -27,60 +27,68 @@ class GeografiaViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         cp = request.query_params.get('cp')
         pais = request.query_params.get('pais', 'MX')
+        
         if not cp:
             return super().list(request, *args, **kwargs)
 
-        opciones_temporales = []
-        estado_info = ""
-        municipio_info = ""
+        estado_final = ""
+        colonia_final = ""
+        municipio_final = ""
+        opciones_fusionadas = {}
 
-        if pais == 'MX' and (cp.startswith('68') or cp.startswith('71')):
-            #lee el json local de oaxaca
-            estado_info = "Oaxaca"
-            municipio_info = "Oaxaca de Juárez" 
-            opciones_temporales = [{"nombre": "Centro"}, {"nombre": "La Soledad"}] 
-        else:
-            url = f"https://api.zippopotam.us/{pais.lower()}/{cp}"
-            response = requests.get(url)
-            
+
+        locales = Geografia.objects.filter(codigo_postal=cp, pais=pais)
+        
+        for loc in locales:
+            if not estado_final and loc.estado:
+                estado_final = loc.estado
+            if not colonia_final and loc.colonia:
+                colonia_final = loc.colonia
+            if not municipio_final and loc.municipio:
+                municipio_final = loc.municipio
+
+            nombre_lugar = loc.colonia if loc.colonia else loc.municipio
+            if nombre_lugar:
+                opciones_fusionadas[nombre_lugar.upper()] = {
+                    "id_geografia": loc.id_geografia, 
+                    "nombre": nombre_lugar
+                }
+
+        url = f"https://api.zippopotam.us/{pais.lower()}/{cp}"
+        try:
+            response = requests.get(url, timeout=5)
+
             if response.status_code == 200:
                 data = response.json()
-                estado_info = data.get('places', [{}])[0].get('state', '')
-   
+                
+                estado_api = data.get('places', [{}])[0].get('state', '')
+                if estado_api:
+                    estado_final = estado_api
+                
                 for place in data.get('places', []):
-                    opciones_temporales.append({"nombre": place.get('place name')})
+                    nombre_api = place.get('place name', '')
+                    
+                    if nombre_api:
+                        if nombre_api.upper() not in opciones_fusionadas:
+                            opciones_fusionadas[nombre_api.upper()] = {
+                                "id_geografia": None, 
+                                "nombre": nombre_api
+                            }
+                            
+        except requests.exceptions.RequestException:
+            pass
 
-        opciones_finales = []
-        
-        for opcion in opciones_temporales:
-            nombre_lugar = opcion['nombre']
-            #compara existencia en la bd
-            geografia_existente = Geografia.objects.filter(
-                codigo_postal=cp, 
-                pais=pais,
-                colonia=nombre_lugar if pais == 'MX' else None,
-                municipio=nombre_lugar if pais != 'MX' else municipio_info
-            ).first()
-
-            if geografia_existente:
-                opciones_finales.append({
-                    "id_geografia": geografia_existente.id_geografia,
-                    "nombre": nombre_lugar
-                })
-            else:
-                opciones_finales.append({
-                    "id_geografia": None,
-                    "nombre": nombre_lugar
-                })
+        opciones_finales = list(opciones_fusionadas.values())
 
         return Response({
             "codigo_postal": cp,
             "pais": pais,
-            "estado": estado_info,
-            "municipio": municipio_info if pais == 'MX' else None,
-            "colonia": None if pais != 'MX' else "", 
+            "estado": estado_final,
+            "municipio": municipio_final if municipio_final else None,
+            "colonia": colonia_final if colonia_final else None, 
             "opciones": opciones_finales
         })
+    
 
 class DireccionViewSet(viewsets.ModelViewSet):
     queryset = Direccion.objects.all()
