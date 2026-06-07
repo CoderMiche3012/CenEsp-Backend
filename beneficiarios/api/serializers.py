@@ -129,13 +129,33 @@ class ExpedienteSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         response = super().to_representation(instance)
         response['id_expediente'] = instance.id_expediente
+        
         familiares_vinculados = Familia.objects.filter(id_expediente=instance.id_expediente)
         response['familia'] = FamiliaSerializer(familiares_vinculados, many=True).data
+
+        documentos = instance.documentos_personales.all()
+        response['documentos'] = DocumentosPersonalesSerializer(documentos, many=True).data
+
+        if 'id_direccion' in response:
+            direccion_data = response.pop('id_direccion') 
+            
+            if direccion_data:
+                geo = direccion_data.pop('geografia_detalle', None)
+                if geo:
+                    direccion_data['geografia'] = {
+                        "id_geografia": geo.get('id_geografia'),
+                        "codigo_postal": geo.get('codigo_postal'),
+                        "municipio": geo.get('municipio'),
+                        "colonia": geo.get('colonia')
+                    }
+                response['direccion'] = direccion_data 
+            else:
+                response['direccion'] = None
+
         return response
 
 class PostulanteSerializer(serializers.ModelSerializer):
     registrado_por = serializers.SerializerMethodField() 
-    id_expediente = ExpedienteSerializer()
 
     class Meta:
         model = Postulante
@@ -143,34 +163,82 @@ class PostulanteSerializer(serializers.ModelSerializer):
 
     def get_registrado_por(self, obj):
         if obj.id_usuario:
-            return f"{obj.id_usuario.nombre} {obj.id_usuario.apellido_p}"
+            return f"{obj.id_usuario.nombre} {obj.id_usuario.apellido_p}".strip()
         return "Sistema"
-    
-    
-    def create(self, validated_data):
-        expediente_data = validated_data.pop('id_expediente')
-        direccion_data = expediente_data.pop('id_direccion', None)
-        familia_data = expediente_data.pop('familia', [])
-
-        if direccion_data:
-            direccion_obj = Direccion.objects.create(**direccion_data)
-            expediente_data['id_direccion'] = direccion_obj
-
-        expediente_obj = Expediente.objects.create(**expediente_data)
-
-        for integrante in familia_data:
-            Familia.objects.create(id_expediente=expediente_obj, **integrante)
-
-        postulante_obj = Postulante.objects.create(id_expediente=expediente_obj, **validated_data)
-
-        return postulante_obj
 
     def to_representation(self, instance):
-        response = super().to_representation(instance)
-        if instance.id_expediente:
-            response['id_expediente']['id_expediente'] = instance.id_expediente.id_expediente
-        return response
+        response = {
+            "id_postulante": instance.id_postulante,
+            "estatus": instance.estatus,
+            "registrado_por": self.get_registrado_por(instance),
+            "usuario": None,
+            "expediente": None,
+            "visita": None,
+            "estudio": None
+        }
 
+        if instance.id_usuario:
+            response["usuario"] = {
+                "id_usuario": instance.id_usuario.pk,
+                "nombre": instance.id_usuario.nombre,
+                "correo": instance.id_usuario.correo
+            }
+
+        if instance.id_expediente:
+            exp_data = ExpedienteSerializer(instance.id_expediente).data
+            
+            direccion_original = exp_data.get('id_direccion')
+            if direccion_original:
+
+                geo = direccion_original.pop('geografia_detalle', None)
+                if geo:
+                    direccion_original['geografia'] = {
+                        "id_geografia": geo.get('id_geografia'),
+                        "codigo_postal": geo.get('codigo_postal'),
+                        "municipio": geo.get('municipio'),
+                        "colonia": geo.get('colonia')
+                    }
+                exp_data['direccion'] = direccion_original
+                del exp_data['id_direccion'] 
+
+            documentos = instance.id_expediente.documentos_personales.all()
+            exp_data['documentos'] = DocumentosPersonalesSerializer(documentos, many=True).data
+            
+            response["expediente"] = exp_data
+
+        visita = instance.visitas.first()
+        if visita:
+            response["visita"] = {
+                "id_visita": visita.id_visita,
+                "fecha_visita": visita.fecha_visita,
+                "estado_visita": visita.estado_visita,
+                "nota_visita": visita.nota_visita
+            }
+
+        estudio = EstudioSocioeconomico.objects.filter(id_expediente=instance.id_expediente).first()
+        if estudio:
+            gastos = Gasto.objects.filter(id_estudiosocioeconomico=estudio)
+            gastos_list = [{"id_gasto": g.pk, "nombre": g.nombre, "monto": float(g.monto)} for g in gastos]
+
+            link_doc = None
+            if hasattr(estudio, 'link_documento') and estudio.link_documento:
+                request = self.context.get('request')
+                link_doc = request.build_absolute_uri(estudio.link_documento.url) if request else estudio.link_documento.url
+
+            response["estudio"] = {
+                "id_estudio": estudio.pk,
+                "estatus_estudio": getattr(estudio, 'estatus_estudio', ''),
+                "nivel_escolar_inicial": getattr(estudio, 'nivel_escolar_inicial', ''),
+                "grado_escolar_inicial": getattr(estudio, 'grado_escolar_inicial', ''),
+                "referencia_ingreso": getattr(estudio, 'referencia_ingreso', ''),
+                "referencia_casa": getattr(estudio, 'referencia_casa', ''),
+                "prioridad_servicio": getattr(estudio, 'prioridad_servicio', ''),
+                "nota_servicio": getattr(estudio, 'nota_servicio', ''),
+                "link_documento": link_doc,
+                "gastos": gastos_list
+            }
+
+        return response
 
 class VisitaPostulanteSerializer(serializers.ModelSerializer):
     class Meta:
@@ -186,7 +254,6 @@ class RegistroPostulanteSerializer(serializers.ModelSerializer):
         model = Postulante
         fields = ['estatus', 'expediente', 'estudio', 'familia']
 
-    #si falla no guardara nada en la base de datos
     @transaction.atomic
     def create(self, validated_data):
         expediente_data = validated_data.pop('expediente')
@@ -248,15 +315,22 @@ class RegistroPostulanteSerializer(serializers.ModelSerializer):
 class EdicionPostulanteSerializer(serializers.ModelSerializer):
     expediente = serializers.DictField(write_only=True, required=False)
     estudio = serializers.DictField(write_only=True, required=False)
+    visita = serializers.DictField(write_only=True, required=False) 
 
     class Meta:
         model = Postulante
-        fields = ['expediente', 'estudio']
+        fields = ['estatus', 'expediente', 'estudio', 'visita'] 
 
     @transaction.atomic
     def update(self, instance, validated_data):
+
+        if 'estatus' in validated_data:
+            instance.estatus = validated_data.get('estatus')
+        instance.save()
+
         expediente_data = validated_data.pop('expediente', None)
         estudio_data = validated_data.pop('estudio', None)
+        visita_data = validated_data.pop('visita', None)
 
         if expediente_data:
             expediente_obj = instance.id_expediente
@@ -264,17 +338,22 @@ class EdicionPostulanteSerializer(serializers.ModelSerializer):
 
             if direccion_data and expediente_obj.id_direccion:
                 direccion_obj = expediente_obj.id_direccion
-                cp = direccion_data.pop('codigo_postal', None)
-                colonia = direccion_data.pop('colonia', None)
-                municipio = direccion_data.pop('municipio', None)
+                
+                geografia_data = direccion_data.pop('geografia', None)
+                if geografia_data:
+                    cp = geografia_data.get('codigo_postal')
+                    colonia = geografia_data.get('colonia')
+                    municipio = geografia_data.get('municipio')
+                    pais = geografia_data.get('pais', 'MX')
 
-                if cp and colonia:
-                    geografia_obj, _ = Geografia.objects.get_or_create(
-                        codigo_postal=cp,
-                        colonia=colonia,
-                        defaults={'municipio': municipio, 'estado': 'Oaxaca'}
-                    )
-                    direccion_obj.id_geografia = geografia_obj
+                    if cp and colonia:
+                        geografia_obj, _ = Geografia.objects.get_or_create(
+                            codigo_postal=cp,
+                            colonia=colonia,
+                            pais=pais,
+                            defaults={'municipio': municipio, 'estado': 'Oaxaca'}
+                        )
+                        direccion_obj.id_geografia = geografia_obj
 
                 for attr, value in direccion_data.items():
                     setattr(direccion_obj, attr, value)
@@ -287,12 +366,37 @@ class EdicionPostulanteSerializer(serializers.ModelSerializer):
         if estudio_data:
             estudio_obj = EstudioSocioeconomico.objects.filter(id_expediente=instance.id_expediente).first()
             if estudio_obj:
+                gastos_data = estudio_data.pop('gastos', None)
+                
                 for attr, value in estudio_data.items():
                     setattr(estudio_obj, attr, value)
                 estudio_obj.save()
 
-        return instance
+                if gastos_data is not None:
+                    Gasto.objects.filter(id_estudiosocioeconomico=estudio_obj).delete()
+                    for gasto in gastos_data:
+                        Gasto.objects.create(id_estudiosocioeconomico=estudio_obj, **gasto)
 
+        if visita_data:
+            visita_obj, _ = Visita_Postulante.objects.get_or_create(
+                id_postulante=instance,
+                defaults={
+                    'fecha_visita': visita_data.get('fecha_visita'),
+                    'estado_visita': visita_data.get('estado_visita', 'Programada'),
+                    'nota_visita': visita_data.get('nota_visita', '')
+                }
+            )
+            
+            if not _:
+                if 'fecha_visita' in visita_data:
+                    visita_obj.fecha_visita = visita_data['fecha_visita']
+                if 'estado_visita' in visita_data:
+                    visita_obj.estado_visita = visita_data['estado_visita']
+                if 'nota_visita' in visita_data:
+                    visita_obj.nota_visita = visita_data['nota_visita']
+                visita_obj.save()
+
+        return instance
 
 class ApoyoEconomicoSerializer(serializers.ModelSerializer):
     concepto = serializers.CharField(validators=[alfanumerico_regex])
