@@ -23,3 +23,6 @@ Password: admin123456-
 
 Crear roles y permisos automaticamente
 python manage.py setup_roles
+
+Migrar: 
+docker exec -it project-backend-1 python manage.py makemigrations    

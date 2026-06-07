@@ -4,14 +4,14 @@ from rest_framework import serializers
 from django.core.validators import RegexValidator
 from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postulante, Beneficiario, Fotografias, SeguimientoBeneficiario, ApoyoEconomico, UsoServicios, Obligacion, DocumentosPersonales, Geografia
 from estudios.models import Familia, EstudioSocioeconomico, Gasto
-from estudios.api.serializers import FamiliaSerializer
+from estudios.api.serializers import FamiliaSerializer, EstudioSocioeconomicoSerializer
 from escolaridad.api.serializers import DatosEscolaresSerializer
 from django.db.models import Count
 
-letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', message='Solo letras y espacios.')
-telefono_regex = RegexValidator(regex=r'^\d{10}$', message='Exactamente 10 dígitos.')
-cp_regex = RegexValidator(regex=r'^\d{5}$', message='Exactamente 5 dígitos.')
-alfanumerico_regex = RegexValidator(regex=r'^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s.,-]+$', message='Solo letras, números y caracteres básicos.')
+letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', message='Solo use letras y espacios.')
+telefono_regex = RegexValidator(regex=r'^\d{10}$', message='El número debe tener exactamente 10 digitos.')
+cp_regex = RegexValidator(regex=r'^\d{5}$', message='Un Código Postal tiene exactamente 5 dígitos.')
+alfanumerico_regex = RegexValidator(regex=r'^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s.,-]+$', message='Solo use letras, números y caracteres básicos.')
 
 class GeografiaSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,7 +54,7 @@ class FotografiasSerializer(serializers.ModelSerializer):
         if not value:
             return value
             
-        # Límite de 3MB para fotos
+        # Límite de 10MB para fotos
         limite_tamano = 10 * 1024 * 1024 
         
         if value.size > limite_tamano:
@@ -253,6 +253,18 @@ class RegistroPostulanteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Postulante
         fields = ['estatus', 'expediente', 'estudio', 'familia']
+    
+    def validate_expediente(self, value):
+        # Despertamos al guardia estricto solo para revisar el diccionario
+        validador = ExpedienteSerializer(data=value, partial=True)
+        validador.is_valid(raise_exception=True)
+        return value
+
+    def validate_estudio(self, value):
+        # Despertamos al guardia del estudio (y de los gastos si vienen)
+        validador = EstudioSocioeconomicoSerializer(data=value, partial=True)
+        validador.is_valid(raise_exception=True)
+        return value
 
     @transaction.atomic
     def create(self, validated_data):
@@ -320,6 +332,18 @@ class EdicionPostulanteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Postulante
         fields = ['estatus', 'expediente', 'estudio', 'visita'] 
+    
+    def validate_expediente(self, value):
+        # Despertamos al guardia estricto solo para revisar el diccionario
+        validador = ExpedienteSerializer(data=value, partial=True)
+        validador.is_valid(raise_exception=True)
+        return value
+
+    def validate_estudio(self, value):
+        # Despertamos al guardia del estudio (y de los gastos si vienen)
+        validador = EstudioSocioeconomicoSerializer(data=value, partial=True)
+        validador.is_valid(raise_exception=True)
+        return value
 
     @transaction.atomic
     def update(self, instance, validated_data):
