@@ -10,7 +10,6 @@ cp_validador = RegexValidator(regex=r'^\d{5}$', message='El código postal debe 
 
 class Geografia(models.Model):
     id_geografia = models.AutoField(primary_key=True)
-    # Se aplica el validador de 5 dígitos al CP
     codigo_postal = models.CharField(max_length=10, validators=[cp_validador]) 
     municipio = models.CharField(max_length=150, null=True, blank=True)
     colonia = models.CharField(max_length=150, null=True, blank=True)
@@ -47,9 +46,7 @@ class Direccion(models.Model):
 class Expediente(models.Model):
     GENERO_CHOICES = [
         ('Masculino', 'Masculino'),
-        ('Femenino', 'Femenino'),
-        ('Otro', 'Otro'),
-        ('Prefiero no decirlo', 'Prefiero no decirlo')
+        ('Femenino', 'Femenino')
     ]
 
     id_expediente = models.AutoField(primary_key=True)
@@ -89,7 +86,6 @@ class Expediente(models.Model):
 class Postulante(models.Model):
     ESTATUS_CHOICES = [
         ('Pendiente', 'Pendiente'),
-        ('En Revisión', 'En Revisión'),
         ('Aceptado', 'Aceptado'),
         ('Rechazado', 'Rechazado')
     ]
@@ -149,9 +145,7 @@ class Visita_Postulante(models.Model):
 class Beneficiario(models.Model):
     ESTATUS_CHOICES = [
         ('Activo', 'Activo'),
-        ('Inactivo', 'Inactivo'),
-        ('Graduado', 'Graduado'),
-        ('Baja', 'Baja')
+        ('Inactivo', 'Inactivo')
     ]
 
     id_beneficiario = models.AutoField(primary_key=True)
@@ -203,7 +197,6 @@ class DocumentosPersonales(models.Model):
         ('Comprobante Domicilio', 'Comprobante de Domicilio'),
         ('Acta Nacimiento', 'Acta de Nacimiento'),
         ('Estudio Médico', 'Estudio Médico'),
-        ('Otro', 'Otro')
     ]
 
     id_documento = models.AutoField(primary_key=True)
