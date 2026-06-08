@@ -4,6 +4,9 @@ from estudios.models import EstudioSocioeconomico, Familia, Analisis, Gasto
 from beneficiarios.models import Expediente
 from datetime import date
 
+letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', message='Solo letras y espacios.')
+telefono_regex = RegexValidator(regex=r'^\d{10}$', message='Exactamente 10 dígitos.')
+
 class AnalisisSerializer(serializers.ModelSerializer):
     class Meta:
         model = Analisis
@@ -33,16 +36,17 @@ class EstudioSocioeconomicoSerializer(serializers.ModelSerializer):
         return estudio
     
 
-
 class FamiliaSerializer(serializers.ModelSerializer):
     id_expediente = serializers.PrimaryKeyRelatedField(
         queryset=Expediente.objects.all(), 
         required=False
     )
-    telefono_regex = RegexValidator(
-        regex=r'^\d{10}$', 
-        message="El número de teléfono debe contener exactamente 10 dígitos."
-    )
+
+    # 1. Agregamos los validadores de texto para nombres y apellidos (Punto 4 del documento)
+    nombre = serializers.CharField(validators=[letras_regex])
+    apellido_p = serializers.CharField(validators=[letras_regex])
+    apellido_m = serializers.CharField(validators=[letras_regex], required=False, allow_blank=True, allow_null=True)
+
     telefono = serializers.CharField(
         validators=[telefono_regex], 
         max_length=20, 
@@ -56,7 +60,7 @@ class FamiliaSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        # 1. Validación de Salario y Actividad (La que ya tenías)
+        # 1. Validación de Salario y Actividad
         actividad = data.get('actividad_principal', '').lower()
         salario = data.get('salario')
 
@@ -72,17 +76,25 @@ class FamiliaSerializer(serializers.ModelSerializer):
 
         if fecha_nacimiento:
             hoy = date.today()
-            # Fórmula exacta para calcular edad tomando en cuenta años bisiestos y meses
+            
+            # Validación explícita para fechas futuras (Punto 2 del documento)
+            if fecha_nacimiento > hoy:
+                raise serializers.ValidationError({
+                    "fecha_nacimiento": "La fecha de nacimiento no puede estar en el futuro."
+                })
+
+            # Fórmula exacta para calcular edad
             edad = hoy.year - fecha_nacimiento.year - ((hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
             
-            if edad < 0 or edad > 100:
+            if edad > 100:
                 raise serializers.ValidationError({
                     "fecha_nacimiento": "La fecha de nacimiento no es lógica (edades entre 0 y 100 años)."
                 })
             
+            # Validación de tutor mayor de edad (Punto 3 del documento)
             if es_tutor and edad < 18:
                 raise serializers.ValidationError({
-                    "fecha_nacimiento": "El tutor principal debe ser mayor de 18 años."
+                    "fecha_nacimiento": "El tutor principal debe ser mayor de 18 años (mayor de edad)."
                 })
         elif es_tutor:
             raise serializers.ValidationError({

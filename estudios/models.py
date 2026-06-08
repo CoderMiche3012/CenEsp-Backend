@@ -17,7 +17,15 @@ class EstudioSocioeconomico(models.Model):
     estatus_estudio = models.CharField(max_length=50)
     prioridad_servicio = models.CharField(max_length=50)
     nota_servicio = models.TextField(null=True, blank=True)
-    link_documento = models.URLField(null=True, blank=True)
+
+    id_documento = models.ForeignKey(
+        'beneficiarios.DocumentosPersonales', # Ajusta el nombre de la app si es diferente
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        db_column='id_documento',
+        related_name='estudios_vinculados'
+    )
 
     class Meta:
         db_table = 'estudio_socioeconomico'

@@ -55,11 +55,11 @@ class FotografiasSerializer(serializers.ModelSerializer):
             return value
             
         # Límite de 10MB para fotos
-        limite_tamano = 10 * 1024 * 1024 
+        limite_tamano = 20 * 1024 * 1024 
         
         if value.size > limite_tamano:
             raise serializers.ValidationError(
-                "La fotografía es demasiado pesada. El tamaño máximo permitido es de 3MB."
+                "La fotografía es demasiado pesada. El tamaño máximo permitido es de 10MB."
             )
             
         return value
@@ -151,6 +151,13 @@ class ExpedienteSerializer(serializers.ModelSerializer):
                 response['direccion'] = direccion_data 
             else:
                 response['direccion'] = None
+        
+        if instance.foto_principal and instance.foto_principal.foto_archivo:
+            request = self.context.get('request')
+            url = instance.foto_principal.foto_archivo.url
+            response['foto_principal'] = request.build_absolute_uri(url) if request else url
+        else:
+            response['foto_principal'] = None
 
         return response
 
@@ -221,9 +228,9 @@ class PostulanteSerializer(serializers.ModelSerializer):
             gastos_list = [{"id_gasto": g.pk, "nombre": g.nombre, "monto": float(g.monto)} for g in gastos]
 
             link_doc = None
-            if hasattr(estudio, 'link_documento') and estudio.link_documento:
+            if estudio.id_documento and estudio.id_documento.archivo:
                 request = self.context.get('request')
-                link_doc = request.build_absolute_uri(estudio.link_documento.url) if request else estudio.link_documento.url
+                link_doc = request.build_absolute_uri(estudio.id_documento.archivo.url) if request else estudio.id_documento.archivo.url
 
             response["estudio"] = {
                 "id_estudio": estudio.pk,
@@ -391,9 +398,16 @@ class EdicionPostulanteSerializer(serializers.ModelSerializer):
             estudio_obj = EstudioSocioeconomico.objects.filter(id_expediente=instance.id_expediente).first()
             if estudio_obj:
                 gastos_data = estudio_data.pop('gastos', None)
+                id_doc = estudio_data.pop('id_documento', None) # <- 1. Extraemos el ID del JSON
                 
+                # Guardamos los campos de texto normales
                 for attr, value in estudio_data.items():
                     setattr(estudio_obj, attr, value)
+                
+                # 2. Inyectamos el ID directamente a la columna física usando el sufijo _id
+                if id_doc is not None:
+                    estudio_obj.id_documento_id = id_doc 
+
                 estudio_obj.save()
 
                 if gastos_data is not None:

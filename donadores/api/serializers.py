@@ -188,6 +188,7 @@ class DonativoDonadorSerializer(serializers.ModelSerializer):
         donador = instance.id_donador
         apellido = f" {donador.apellido_paterno}" if donador.apellido_paterno else ""
         nombre_completo = f"{donador.nombre}{apellido}".strip()
+        
 
         return {
             "id_donativo": instance.id_donativo,
@@ -196,5 +197,8 @@ class DonativoDonadorSerializer(serializers.ModelSerializer):
             "concepto": instance.concepto,
             "monto": float(instance.monto), 
             "moneda": instance.moneda,
+            #agregado
+            "fecha": instance.fecha,
             "periodo": str(instance.id_periodo_id) 
         }
+    
