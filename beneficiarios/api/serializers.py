@@ -6,7 +6,7 @@ from beneficiarios.models import Direccion, Expediente, Postulante, Visita_Postu
 from estudios.models import Familia, EstudioSocioeconomico, Gasto
 from estudios.api.serializers import FamiliaSerializer, EstudioSocioeconomicoSerializer
 from escolaridad.api.serializers import DatosEscolaresSerializer
-from django.db.models import Count
+from periodos.models import Periodo 
 
 letras_regex = RegexValidator(regex=r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', message='Solo use letras y espacios.')
 telefono_regex = RegexValidator(regex=r'^\d{10}$', message='El número debe tener exactamente 10 digitos.')
@@ -435,6 +435,66 @@ class EdicionPostulanteSerializer(serializers.ModelSerializer):
                 visita_obj.save()
 
         return instance
+
+class RegistroDirectoBeneficiarioSerializer(serializers.ModelSerializer):
+    expediente = serializers.DictField(write_only=True)
+    familia = serializers.ListField(write_only=True, required=False)
+
+    class Meta:
+        model = Beneficiario
+        fields = ['estatus', 'fecha_ingreso', 'notas', 'expediente', 'familia']
+
+    @transaction.atomic
+    def create(self, validated_data):
+        # 1. Extraemos los bloques grandes
+        expediente_data = validated_data.pop('expediente')
+        familia_data = validated_data.pop('familia', [])
+
+        # 2. Magia de Geografía y Dirección (La Bifurcación)
+        direccion_data = expediente_data.pop('direccion', None)
+        if direccion_data:
+            cp = direccion_data.pop('codigo_postal', '')
+            colonia = direccion_data.pop('colonia', '')
+            municipio = direccion_data.pop('municipio', '')
+            
+            geografia_obj, _ = Geografia.objects.get_or_create(
+                codigo_postal=cp,
+                colonia=colonia,
+                defaults={'municipio': municipio, 'estado': 'Oaxaca'} 
+            )
+            
+            direccion_obj = Direccion.objects.create(
+                id_geografia=geografia_obj,
+                **direccion_data
+            )
+            expediente_data['id_direccion'] = direccion_obj
+
+        # 3. Creamos el Expediente físico
+        expediente_obj = Expediente.objects.create(**expediente_data)
+
+        # 4. Registramos a toda la familia anclada al expediente
+        for fam in familia_data:
+            Familia.objects.create(id_expediente=expediente_obj, **fam)
+
+        # 5. Creamos al Beneficiario VIP directo
+        beneficiario = Beneficiario.objects.create(
+            id_expediente=expediente_obj,
+            **validated_data
+        )
+
+        # 6. ¡CORRECCIÓN EN EL SEGUIMIENTO!
+        periodo_actual = Periodo.objects.filter(estado=True).first()
+        if periodo_actual:
+            SeguimientoBeneficiario.objects.create(
+                id_beneficiario=beneficiario,
+                id_periodo=periodo_actual,
+                estatus='Activo',
+                # Agregamos la nota para que no explote tu validación del modelo
+                nota_seguimiento='Inscripción automática generada por migración inicial de datos.' 
+            )
+
+        return beneficiario
+
 
 class ApoyoEconomicoSerializer(serializers.ModelSerializer):
     concepto = serializers.CharField(validators=[alfanumerico_regex])

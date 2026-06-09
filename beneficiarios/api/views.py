@@ -17,7 +17,7 @@ from .serializers import (DireccionSerializer, ExpedienteSerializer, PostulanteS
                           VisitaPostulanteSerializer, BeneficiarioSerializer, 
                           FotografiasSerializer, SeguimientoBeneficiarioSerializer, 
                           ApoyoEconomicoSerializer, UsoServiciosSerializer, 
-                          ObligacionSerializer, DocumentosPersonalesSerializer, GeografiaSerializer)
+                          ObligacionSerializer, DocumentosPersonalesSerializer, GeografiaSerializer, RegistroDirectoBeneficiarioSerializer)
 
 
 class GeografiaViewSet(viewsets.ModelViewSet):
@@ -197,6 +197,14 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
         activos = Beneficiario.objects.filter(estatus='Activo')
         serializer = self.get_serializer(activos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def get_serializer_class(self):
+        # Si Dalia manda un POST (Registro nuevo VIP), usamos el masivo
+        if self.action == 'create':
+            return RegistroDirectoBeneficiarioSerializer
+        
+        # Si hace un GET, PATCH o PUT, usamos el serializador normal que ya tenías
+        return BeneficiarioSerializer
 
 class FotografiasViewSet(viewsets.ModelViewSet):
     queryset = Fotografias.objects.all()
