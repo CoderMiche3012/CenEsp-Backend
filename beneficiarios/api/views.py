@@ -7,6 +7,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import transaction
 from rest_framework.views import APIView
 from periodos.models import Periodo
+from estudios.models import EstudioSocioeconomico
 from beneficiarios.models import (Direccion, Expediente, Postulante, Visita_Postulante, 
                                   Beneficiario, Fotografias, SeguimientoBeneficiario, 
                                   ApoyoEconomico, UsoServicios, Obligacion, 
@@ -205,6 +206,63 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
         
         # Si hace un GET, PATCH o PUT, usamos el serializador normal que ya tenías
         return BeneficiarioSerializer
+    
+    @action(detail=True, methods=['get'], url_path='antecedentes-ingreso')
+    def antecedentes_ingreso(self, request, pk=None):
+        # 1. Obtenemos al Beneficiario que Dalia está consultando
+        beneficiario = self.get_object()
+        expediente = beneficiario.id_expediente
+
+        if not expediente:
+            return Response(
+                {"mensaje": "El beneficiario no tiene un expediente asociado."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 2. La prueba de fuego: ¿Pasó por la aduana de Postulantes?
+        postulante = Postulante.objects.filter(id_expediente=expediente).first()
+
+        if not postulante:
+            # ¡El carril VIP! Fue migrado directamente
+            return Response({
+                "mensaje": "Este beneficiario fue registrado por migración directa en el sistema. No cuenta con visita previa ni estudio socioeconómico de postulación."
+            }, status=status.HTTP_200_OK)
+
+        # 3. Si llegamos aquí, SÍ fue postulante. Buscamos sus datos.
+        # Buscamos la visita más reciente (por si le reprogramaron alguna)
+        visita = Visita_Postulante.objects.filter(id_postulante=postulante).order_by('-fecha_visita').first()
+        estudio = EstudioSocioeconomico.objects.filter(id_expediente=expediente).first()
+
+        # 4. Armamos el JSON a la medida para Dalia
+        data = {
+            "mensaje": "Antecedentes de ingreso",
+            "visita": None,
+            "estudio_socioeconomico": None
+        }
+
+        if visita:
+            data["visita"] = {
+                "id_visita": visita.id_visita,
+                "fecha_visita": visita.fecha_visita,
+                "estado_visita": visita.estado_visita,
+                "nota_visita": visita.nota_visita
+            }
+
+        if estudio:
+            # Puedes usar request.build_absolute_uri() si también quieres mandarle el link del PDF aquí
+            data["estudio_socioeconomico"] = {
+                "id_estudio": estudio.id_estudio,
+                "nivel_escolar_inicial": estudio.nivel_escolar_inicial,
+                "grado_escolar_inicial": estudio.grado_escolar_inicial,
+                "referencia_ingreso": estudio.referencia_ingreso,
+                "referencia_casa": estudio.referencia_casa,
+                "estatus_estudio": estudio.estatus_estudio,
+                "prioridad_servicio": estudio.prioridad_servicio,
+                "nota_servicio": estudio.nota_servicio,
+                "id_documento": estudio.id_documento_id if estudio.id_documento else None
+            }
+
+        return Response(data, status=status.HTTP_200_OK)
 
 class FotografiasViewSet(viewsets.ModelViewSet):
     queryset = Fotografias.objects.all()
