@@ -536,6 +536,10 @@ class SeguimientoBeneficiarioSerializer(serializers.ModelSerializer):
 
 
 class BeneficiarioSerializer(serializers.ModelSerializer):
+    # --- LA PUERTA DE ENTRADA (Para el PATCH de Dalia) ---
+    expediente = serializers.DictField(write_only=True, required=False)
+    
+    # --- TUS CAMPOS DE SALIDA (Para el GET) ---
     expediente_resumen = serializers.SerializerMethodField()
     donadores = serializers.SerializerMethodField()
     historial_seguimientos = serializers.SerializerMethodField()
@@ -544,22 +548,43 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
         model = Beneficiario
         fields = [
             'id_beneficiario', 'estatus', 'fecha_ingreso', 'notas', 
-            'expediente_resumen', 'donadores', 'historial_seguimientos'
+            'expediente_resumen', 'donadores', 'historial_seguimientos',
+            'expediente' # <- Importante agregar la puerta de entrada a los fields
         ]
 
+    # ==========================================
+    # LÓGICA DE LECTURA (Tus métodos intactos)
+    # ==========================================
     def get_expediente_resumen(self, obj):
         expediente = obj.id_expediente
         direccion = expediente.id_direccion
+        
+        # Inicializamos las variables en None por si el expediente no tiene dirección
+        calle = None
+        numero = None
+        colonia = None
         municipio = None
-        if direccion and hasattr(direccion, 'id_geografia') and direccion.id_geografia:
-            municipio = direccion.id_geografia.municipio
+        codigo_postal = None
+        
+        if direccion:
+            calle = direccion.calle
+            numero = direccion.numero
+            if hasattr(direccion, 'id_geografia') and direccion.id_geografia:
+                municipio = direccion.id_geografia.municipio
+                colonia = direccion.id_geografia.colonia
+                codigo_postal = direccion.id_geografia.codigo_postal
             
         return {
             "id_expediente": expediente.id_expediente,
             "nombre_completo": f"{expediente.nombre} {expediente.apellido_p} {expediente.apellido_m or ''}".strip(),
             "fecha_nacimiento": expediente.fecha_nacimiento,
             "telefono": expediente.telefono,
-            "municipio": municipio
+            # --- AGREGAMOS LA DIRECCIÓN AL JSON DE SALIDA ---
+            "calle": calle,
+            "numero": numero,
+            "colonia": colonia,
+            "municipio": municipio,
+            "codigo_postal": codigo_postal
         }
 
     def get_donadores(self, obj):
@@ -567,5 +592,63 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
         return [{"id_donador": p.id_donador, "nombre": p.nombre} for p in padrinos]
 
     def get_historial_seguimientos(self, obj):
-        seguimientos = SeguimientoBeneficiario.objects.filter(id_beneficiario=obj)
+        seguimientos = obj.seguimientos.all() # Usando tu related_name
+        # O tu versión original: SeguimientoBeneficiario.objects.filter(id_beneficiario=obj)
         return SeguimientoBeneficiarioSerializer(seguimientos, many=True).data
+
+    # ==========================================
+    # LÓGICA DE ESCRITURA (La cascada para el PATCH)
+    # ==========================================
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        # Extraemos el bloque del expediente si es que Dalia lo mandó
+        expediente_data = validated_data.pop('expediente', None)
+
+        # Actualizamos los campos directos del Beneficiario (estatus, notas, fecha)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Inicia la Cascada: Si hay datos de expediente, entramos a actualizar
+        if expediente_data:
+            expediente_obj = instance.id_expediente
+            
+            if expediente_obj:
+                # Separamos la dirección antes de guardar el expediente
+                direccion_data = expediente_data.pop('direccion', None)
+
+                # Guardamos los textos del expediente (nombre, teléfono, etc.)
+                for attr, value in expediente_data.items():
+                    setattr(expediente_obj, attr, value)
+                expediente_obj.save()
+
+                # La Cascada Final: La Dirección y Geografía
+                if direccion_data:
+                    direccion_obj = expediente_obj.id_direccion
+                    
+                    if direccion_obj:
+                        # Reemplazamos calle y número
+                        direccion_obj.calle = direccion_data.get('calle', direccion_obj.calle)
+                        direccion_obj.numero = direccion_data.get('numero', direccion_obj.numero)
+
+                        # Evaluamos la Geografía (Código Postal y Colonia)
+                        cp = direccion_data.get('codigo_postal')
+                        colonia = direccion_data.get('colonia')
+                        municipio = direccion_data.get('municipio')
+
+                        if cp and colonia:
+                            geografia_obj, _ = Geografia.objects.get_or_create(
+                                codigo_postal=cp,
+                                colonia=colonia,
+                                defaults={
+                                    'municipio': municipio or direccion_obj.id_geografia.municipio, 
+                                    'estado': 'Oaxaca', 
+                                    'pais': 'MX'
+                                }
+                            )
+                            # Enlazamos el nuevo (o existente) ID geográfico
+                            direccion_obj.id_geografia = geografia_obj
+
+                        direccion_obj.save()
+
+        return instance
