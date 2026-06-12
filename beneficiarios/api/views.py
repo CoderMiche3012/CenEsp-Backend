@@ -8,6 +8,8 @@ from django.db import transaction
 from rest_framework.views import APIView
 from periodos.models import Periodo
 from estudios.models import EstudioSocioeconomico
+from escolaridad.models import Escolaridad, DatosEscolares
+from periodos.models import Periodo
 from beneficiarios.models import (Direccion, Expediente, Postulante, Visita_Postulante, 
                                   Beneficiario, Fotografias, SeguimientoBeneficiario, 
                                   ApoyoEconomico, UsoServicios, Obligacion, 
@@ -263,6 +265,148 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
             }
 
         return Response(data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'], url_path='resumen')
+    def resumen_general(self, request):
+        beneficiarios = self.get_queryset()
+        data = []
+        
+        for b in beneficiarios:
+            exp = b.id_expediente
+            dir_obj = exp.id_direccion
+            municipio = dir_obj.id_geografia.municipio if dir_obj and getattr(dir_obj, 'id_geografia', None) else None
+            
+            # Sacamos el último seguimiento
+            ultimo_seg = b.seguimientos.order_by('-id_seguimiento').first()
+            seg_data = None
+            
+            if ultimo_seg:
+                # --- LA CORRECCIÓN EMPIEZA AQUÍ ---
+                # Usamos try/except porque en relaciones Uno a Uno, si no existe, Django lanza un error
+                try:
+                    datos_esc = ultimo_seg.datos_escolares
+                except Exception:
+                    datos_esc = None
+                # --- LA CORRECCIÓN TERMINA AQUÍ ---
+                
+                seg_data = {
+                    "id_seguimiento": ultimo_seg.id_seguimiento,
+                    "nota_seguimiento": ultimo_seg.nota_seguimiento,
+                    "estatus": ultimo_seg.estatus,
+                    "periodo": {
+                        "id_periodo": ultimo_seg.id_periodo.id_periodo,
+                        "ciclo_escolar": ultimo_seg.id_periodo.ciclo_escolar
+                    } if ultimo_seg.id_periodo else None,
+                    "datos_escolares": {
+                        "nivel": datos_esc.id_escolaridad.nivel_escolar if datos_esc and getattr(datos_esc, 'id_escolaridad', None) else None,
+                        "grado": datos_esc.id_escolaridad.grado_escolar if datos_esc and getattr(datos_esc, 'id_escolaridad', None) else None,
+                        "escuela": datos_esc.id_institucion.nombre if datos_esc and getattr(datos_esc, 'id_institucion', None) else None
+                    } if datos_esc else None
+                }
+            data.append({
+                "id_beneficiario": b.id_beneficiario,
+                "estatus": b.estatus,
+                "expediente_resumen": {
+                    "nombre_completo": f"{exp.nombre} {exp.apellido_p} {exp.apellido_m or ''}".strip(),
+                    "fecha_nacimiento": exp.fecha_nacimiento,
+                    "telefono": exp.telefono,
+                    "municipio": municipio
+                },
+                "ultimo_seguimiento": seg_data
+            })
+            
+        return Response(data)
+    
+    @action(detail=False, methods=['post'], url_path='reinscripcion-masiva')
+    @transaction.atomic
+    def reinscripcion_masiva(self, request):
+        periodo_anterior_id = request.data.get('periodo_anterior')
+        periodo_nuevo_id = request.data.get('periodo_nuevo')
+
+        if not periodo_anterior_id or not periodo_nuevo_id:
+            return Response({"error": "Faltan los IDs de los periodos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Obtenemos todos los seguimientos activos del periodo viejo
+        seguimientos_viejos = SeguimientoBeneficiario.objects.filter(
+            id_periodo_id=periodo_anterior_id, 
+            estatus='Activo'
+        )
+
+        nuevos_registros = 0
+
+        for seg_viejo in seguimientos_viejos:
+            # 2. Creamos el nuevo seguimiento para el periodo 2026-2027
+            nuevo_seguimiento, creado = SeguimientoBeneficiario.objects.get_or_create(
+                id_beneficiario=seg_viejo.id_beneficiario,
+                id_periodo_id=periodo_nuevo_id,
+                defaults={
+                    'estatus': 'Activo',
+                    'nota_seguimiento': 'Reinscripción automática pendiente de revisión.'
+                }
+            )
+
+            # Si ya existía (por si Dalia le dio doble clic), lo saltamos
+            if not creado:
+                continue
+
+            # 3. Buscamos los datos escolares del año pasado
+            datos_viejos = DatosEscolares.objects.filter(id_seguimiento=seg_viejo).first()
+
+            if datos_viejos and datos_viejos.id_escolaridad:
+                escolaridad_vieja = datos_viejos.id_escolaridad
+                grado_actual = str(escolaridad_vieja.grado_escolar).strip()
+                nivel_actual = str(escolaridad_vieja.nivel_escolar).strip().lower()
+
+                nuevo_grado = grado_actual
+                nuevo_nivel = escolaridad_vieja.nivel_escolar
+
+                # 🧠 EL CEREBRO DE LA PROMOCIÓN (Ajusta los textos según tu catálogo exacto)
+                if nivel_actual == 'preescolar':
+                    if grado_actual in ['1', '1ero']: nuevo_grado = '2'
+                    elif grado_actual in ['2', '2do']: nuevo_grado = '3'
+                    elif grado_actual in ['3', '3ero']: 
+                        nuevo_grado = '1'
+                        nuevo_nivel = 'Primaria'
+                elif nivel_actual == 'primaria':
+                    if grado_actual == '1': nuevo_grado = '2'
+                    elif grado_actual == '2': nuevo_grado = '3'
+                    elif grado_actual == '3': nuevo_grado = '4'
+                    elif grado_actual == '4': nuevo_grado = '5'
+                    elif grado_actual == '5': nuevo_grado = '6'
+                    elif grado_actual == '6':
+                        nuevo_grado = '1'
+                        nuevo_nivel = 'Secundaria'
+                elif nivel_actual == 'secundaria':
+                    if grado_actual == '1': nuevo_grado = '2'
+                    elif grado_actual == '2': nuevo_grado = '3'
+                    elif grado_actual == '3':
+                        nuevo_grado = '1'
+                        nuevo_nivel = 'Bachillerato'
+
+                # 4. Buscamos la nueva escolaridad en el catálogo (ej: "1" de "Secundaria")
+                # Si no existe en el catálogo, la creamos silenciosamente
+                nueva_escolaridad, _ = Escolaridad.objects.get_or_create(
+                    grado_escolar=nuevo_grado,
+                    nivel_escolar=nuevo_nivel
+                )
+
+                # 5. Creamos los Datos Escolares nuevos dejando la escuela en blanco
+                DatosEscolares.objects.create(
+                    id_seguimiento=nuevo_seguimiento,
+                    id_escolaridad=nueva_escolaridad,
+                    id_institucion=None,         # Pendiente como pediste
+                    grupo='',                    # Pendiente
+                    turno='',                    # Pendiente
+                    especialidad='',             # Pendiente
+                    modalidad_educativa=''       # Pendiente
+                )
+            
+            nuevos_registros += 1
+
+        return Response({
+            "mensaje": f"Se reinscribieron exitosamente {nuevos_registros} beneficiarios con promoción de grado automático.",
+            "registros_afectados": nuevos_registros
+        }, status=status.HTTP_201_CREATED)
 
 class FotografiasViewSet(viewsets.ModelViewSet):
     queryset = Fotografias.objects.all()
@@ -400,3 +544,50 @@ class GeografiaConsultaView(APIView):
             "colonia": None if pais != 'MX' else "", 
             "opciones": opciones_finales
         })
+    
+
+class ReporteAsistenciasView(APIView):
+    def get(self, request):
+        mes_anio = request.query_params.get('mes') # Ej: "2026-06"
+        servicio = request.query_params.get('servicio') # Ej: "comedor"
+        
+        # Iniciamos con todos los registros
+        queryset = UsoServicios.objects.all() # Cambia 'UsoServicio' por el nombre real de tu modelo
+        
+        # Filtramos por servicio
+        if servicio:
+            queryset = queryset.filter(tipo_servicio__icontains=servicio)
+            
+        # Filtramos por mes y año
+        if mes_anio and len(mes_anio.split('-')) == 2:
+            anio, mes = mes_anio.split('-')
+            queryset = queryset.filter(fecha_realizacion__year=anio, fecha_realizacion__month=mes)
+            
+        data = []
+        for uso in queryset:
+            seg = uso.id_seguimiento
+            ben = seg.id_beneficiario if seg else None
+            exp = ben.id_expediente if ben else None
+            
+            exp_resumen = None
+            if exp:
+                dir_obj = exp.id_direccion
+                mun = dir_obj.id_geografia.municipio if dir_obj and getattr(dir_obj, 'id_geografia', None) else None
+                exp_resumen = {
+                    "nombre_completo": f"{exp.nombre} {exp.apellido_p} {exp.apellido_m or ''}".strip(),
+                    "fecha_nacimiento": exp.fecha_nacimiento,
+                    "telefono": exp.telefono,
+                    "municipio": mun
+                }
+                
+            data.append({
+                "expediente_resumen": exp_resumen,
+                "id_servicio": uso.id_servicio, # Ajusta según tu modelo
+                "tipo_servicio": uso.tipo_servicio,
+                "numero_acompanantes": uso.numero_acompanantes,
+                "fecha_realizacion": uso.fecha_realizacion,
+                "asistencia": uso.asistencia,
+                "id_seguimiento": seg.id_seguimiento if seg else None
+            })
+            
+        return Response(data)

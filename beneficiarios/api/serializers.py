@@ -589,7 +589,13 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
 
     def get_donadores(self, obj):
         padrinos = obj.padrinos.all()
-        return [{"id_donador": p.id_donador, "nombre": p.nombre} for p in padrinos]
+        return [
+            {
+                "id_donador": p.id_donador, 
+                "nombre": f"{p.nombre} {p.apellido_paterno} {p.apellido_materno or ''}".strip()
+            } 
+            for p in padrinos
+        ]
 
     def get_historial_seguimientos(self, obj):
         seguimientos = obj.seguimientos.all() # Usando tu related_name
@@ -652,3 +658,22 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
                         direccion_obj.save()
 
         return instance
+    
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+        request = self.context.get('request')
+        
+        # Leemos si Dalia mandó el parámetro ?periodo=1 en la URL
+        periodo_id = request.query_params.get('periodo') if request else None
+        
+        if periodo_id:
+            # Filtramos el seguimiento exacto
+            seguimiento = instance.seguimientos.filter(id_periodo=periodo_id).first()
+            
+            # Borramos el historial completo del JSON
+            response.pop('historial_seguimientos', None)
+            
+            # Creamos el nodo único 'seguimiento'
+            response['seguimiento'] = SeguimientoBeneficiarioSerializer(seguimiento).data if seguimiento else None
+            
+        return response

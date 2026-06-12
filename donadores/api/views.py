@@ -158,4 +158,29 @@ class DonadorViewSet(viewsets.ModelViewSet):
             resumen[donador_id]["totales"][item['moneda']] = float(item['total_monto'])
 
         return Response(list(resumen.values()), status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'], url_path='resumen-totales')
+    def resumen_totales(self, request):
+        donadores = self.get_queryset()
+        data = []
+        
+        for d in donadores:
+            donativos = d.donativos.all() # Ajusta 'donativos' por tu related_name real
+            totales = {}
+            
+            for don in donativos:
+                totales[don.moneda] = totales.get(don.moneda, 0) + float(don.monto)
+            
+            ultima_donacion = donativos.order_by('-fecha').first() # Ajusta el nombre de tu campo de fecha
+            
+            data.append({
+                "id_donador": d.id_donador,
+                "nombreCompleto": f"{d.nombre} {d.apellido_paterno} {d.apellido_materno or ''}".strip(),
+                "tipo": d.tipo_donador,
+                "cantidad_donativos": donativos.count(),
+                "ultimaFechaDonacion": ultima_donacion.fecha if ultima_donacion else None,
+                "totales": totales
+            })
+            
+        return Response(data)
 
