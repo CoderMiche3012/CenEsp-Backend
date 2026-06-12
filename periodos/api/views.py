@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 
 def calcular_siguiente_escolaridad(escolaridad_actual):
     """
-    Algoritmo de avance académico. 
-    Intenta subir de grado al alumno o cambiarlo de nivel si se graduó.
+    Algoritmo de avance académico robustecido para el CEI.
+    Promueve el grado de forma automática y gestiona los cambios de nivel escolar.
     """
     nivel = escolaridad_actual.nivel_escolar.strip().lower()
     grado_str = escolaridad_actual.grado_escolar.strip()
     
     try:
+        # Extraemos el número por si viene como "1", "1ro" o "1°"
         grado_num = int(''.join(filter(str.isdigit, grado_str)))
     except ValueError:
         return escolaridad_actual 
@@ -28,27 +29,37 @@ def calcular_siguiente_escolaridad(escolaridad_actual):
     siguiente_grado = grado_num + 1
     siguiente_nivel = escolaridad_actual.nivel_escolar
 
-
-    if 'primaria' in nivel and grado_num == 6:
+    # PROMOCIÓN ACADÉMICA
+    if 'preescolar' in nivel and grado_num == 3:
+        siguiente_grado = 1
+        siguiente_nivel = 'Primaria'
+    elif 'primaria' in nivel and grado_num == 6:
         siguiente_grado = 1
         siguiente_nivel = 'Secundaria'
     elif 'secundaria' in nivel and grado_num == 3:
         siguiente_grado = 1
-        siguiente_nivel = 'Bachillerato'
-    elif ('bachillerato' in nivel or 'preparatoria' in nivel) and grado_num == 3: #para años de bachillerato
+        siguiente_nivel = 'Preparatoria' # Cambiado a Preparatoria/Media Superior según requerimiento
+    elif ('bachillerato' in nivel or 'preparatoria' in nivel or 'media superior' in nivel) and grado_num == 3:
         siguiente_grado = 1
         siguiente_nivel = 'Universidad'
     elif 'universidad' in nivel:
+        # Si ya está en la universidad, no asumimos graduación automática, se mantiene constante
         return escolaridad_actual 
 
-    # Buscamos la nueva escolaridad en la base de datos
+    # Buscamos la combinación en el catálogo oficial de Escolaridad
     nueva_esc = Escolaridad.objects.filter(
         nivel_escolar__icontains=siguiente_nivel, 
         grado_escolar__icontains=str(siguiente_grado)
     ).first()
 
-    return nueva_esc if nueva_esc else escolaridad_actual
+    # Si no existe en el catálogo, creamos el registro para no detener el sistema
+    if not nueva_esc:
+        nueva_esc, _ = Escolaridad.objects.get_or_create(
+            nivel_escolar=siguiente_nivel,
+            grado_escolar=str(siguiente_grado)
+        )
 
+    return nueva_esc
 
 class PeriodoViewSet(viewsets.ModelViewSet):
     queryset = Periodo.objects.all()
@@ -101,19 +112,29 @@ class PeriodoViewSet(viewsets.ModelViewSet):
                         )
                         seguimientos_migrados += 1
 
-                        if hasattr(seg_viejo, 'datos_escolares'):
+                        if hasattr(seg_viejo, 'datos_escolares') and seg_viejo.datos_escolares:
                             datos_viejos = seg_viejo.datos_escolares
    
+                            # Calculamos grado y nivel nuevos
                             nueva_escolaridad = calcular_siguiente_escolaridad(datos_viejos.id_escolaridad)
 
+                            # REGLA DE NEGOCIO: Si cambió el nivel educativo, la institución DEBE quedar vacía (None)
+                            # para obligar a Dalia a ingresar la nueva escuela de nivel superior.
+                            hubo_cambio_nivel = (datos_viejos.id_escolaridad.nivel_escolar.lower() != nueva_escolaridad.nivel_escolar.lower())
+                            institucion_destino = None if hubo_cambio_nivel else datos_viejos.id_institucion
+                            
+                            # Si cambia de nivel, limpiamos grupo y turno; si es avance regular, los conservamos.
+                            grupo_destino = "" if hubo_cambio_nivel else datos_viejos.grupo
+                            turno_destino = "" if hubo_cambio_nivel else datos_viejos.turno
+
                             DatosEscolares.objects.create(
-                                grupo=datos_viejos.grupo,
-                                especialidad=datos_viejos.especialidad,
-                                turno=datos_viejos.turno,
+                                grupo=grupo_destino,
+                                especialidad=datos_viejos.especialidad if not hubo_cambio_nivel else "",
+                                turno=turno_destino,
                                 nota_escolar=datos_viejos.nota_escolar,
                                 modalidad_educativa=datos_viejos.modalidad_educativa,
                                 id_escolaridad=nueva_escolaridad,     
-                                id_institucion=datos_viejos.id_institucion, 
+                                id_institucion=institucion_destino, 
                                 id_seguimiento=seg_nuevo              
                             )
 
