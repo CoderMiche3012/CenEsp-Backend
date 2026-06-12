@@ -540,6 +540,7 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
     expediente = serializers.DictField(write_only=True, required=False)
     
     # --- TUS CAMPOS DE SALIDA (Para el GET) ---
+    familia = serializers.SerializerMethodField()
     expediente_resumen = serializers.SerializerMethodField()
     donadores = serializers.SerializerMethodField()
     historial_seguimientos = serializers.SerializerMethodField()
@@ -549,7 +550,8 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
         fields = [
             'id_beneficiario', 'estatus', 'fecha_ingreso', 'notas', 
             'expediente_resumen', 'donadores', 'historial_seguimientos',
-            'expediente' # <- Importante agregar la puerta de entrada a los fields
+            'familia',
+            'expediente'
         ]
 
     # ==========================================
@@ -579,7 +581,6 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
             "nombre_completo": f"{expediente.nombre} {expediente.apellido_p} {expediente.apellido_m or ''}".strip(),
             "fecha_nacimiento": expediente.fecha_nacimiento,
             "telefono": expediente.telefono,
-            # --- AGREGAMOS LA DIRECCIÓN AL JSON DE SALIDA ---
             "calle": calle,
             "numero": numero,
             "colonia": colonia,
@@ -658,6 +659,31 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
                         direccion_obj.save()
 
         return instance
+    
+    def get_familia(self, obj):
+        expediente = obj.id_expediente
+        if not expediente:
+            return []
+            
+        # Accedemos a los familiares enlazados a este expediente
+        # Nota: Ajusta 'familiares' o 'familia_set' según el related_name de tu modelo Familia
+        parientes = expediente.familiares.all() 
+        
+        return [
+            {
+                "nombre": p.nombre,
+                "apellido_p": p.apellido_p,
+                "apellido_m": p.apellido_m,
+                "parentesco": p.parentesco,
+                "telefono": p.telefono,
+                "fecha_nacimiento": p.fecha_nacimiento,
+                "actividad_principal": p.actividad_principal,
+                "salario": float(p.salario) if p.salario else 0.0,
+                "vive_en_casa": p.vive_en_casa,
+                "es_tutor_principal": p.es_tutor_principal
+            }
+            for p in parientes
+        ]
     
     def to_representation(self, instance):
         response = super().to_representation(instance)
