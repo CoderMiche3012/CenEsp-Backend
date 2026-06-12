@@ -665,12 +665,18 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
         if not expediente:
             return []
             
-        # Accedemos a los familiares enlazados a este expediente
-        # Nota: Ajusta 'familiares' o 'familia_set' según el related_name de tu modelo Familia
         parientes = expediente.familiares.all() 
         
-        return [
-            {
+        resultado_familia = []
+        for p in parientes:
+            # --- CONVERSIÓN SEGURA DE SALARIO A PRUEBA DE BALAS ---
+            try:
+                salario_formateado = float(p.salario) if p.salario else 0.0
+            except (ValueError, TypeError):
+                # Si Dalia puso texto como "No aplica", el sistema no explota y asigna 0.0
+                salario_formateado = 0.0
+                
+            resultado_familia.append({
                 "nombre": p.nombre,
                 "apellido_p": p.apellido_p,
                 "apellido_m": p.apellido_m,
@@ -678,12 +684,12 @@ class BeneficiarioSerializer(serializers.ModelSerializer):
                 "telefono": p.telefono,
                 "fecha_nacimiento": p.fecha_nacimiento,
                 "actividad_principal": p.actividad_principal,
-                "salario": float(p.salario) if p.salario else 0.0,
+                "salario": salario_formateado, # <- Usamos la variable segura
                 "vive_en_casa": p.vive_en_casa,
                 "es_tutor_principal": p.es_tutor_principal
-            }
-            for p in parientes
-        ]
+            })
+            
+        return resultado_familia
     
     def to_representation(self, instance):
         response = super().to_representation(instance)
