@@ -273,49 +273,84 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
         
         for b in beneficiarios:
             exp = b.id_expediente
-            dir_obj = exp.id_direccion
-            municipio = dir_obj.id_geografia.municipio if dir_obj and getattr(dir_obj, 'id_geografia', None) else None
             
-            # Sacamos el último seguimiento
+            # --- 1. EXTRAER EL TUTOR PRINCIPAL Y SU TELÉFONO ---
+            nombre_tutor = "Sin asignar"
+            telefono_tutor = None
+            
+            if exp:
+                # Buscamos en la tabla familia el que esté marcado como tutor principal
+                tutor_obj = exp.familiares.filter(es_tutor_principal=True).first()
+                if tutor_obj:
+                    nombre_tutor = f"{tutor_obj.nombre} {tutor_obj.apellido_p} {tutor_obj.apellido_m or ''}".strip()
+                    telefono_tutor = tutor_obj.telefono
+
+            # --- 2. SACAR EL ÚLTIMO SEGUIMIENTO Y SUS DATOS ESCOLARES ---
             ultimo_seg = b.seguimientos.order_by('-id_seguimiento').first()
             seg_data = None
             
             if ultimo_seg:
-                # --- LA CORRECCIÓN EMPIEZA AQUÍ ---
-                # Usamos try/except porque en relaciones Uno a Uno, si no existe, Django lanza un error
+                # Intento seguro de obtener los datos escolares (relación Uno a Uno)
                 try:
                     datos_esc = ultimo_seg.datos_escolares
                 except Exception:
                     datos_esc = None
-                # --- LA CORRECCIÓN TERMINA AQUÍ ---
                 
+                datos_escolares_data = None
+                if datos_esc:
+                    # --- 3. CALCULAR EL PROMEDIO DESDE LAS BOLETAS ---
+                    # Buscamos todas las boletas asociadas a este registro escolar
+                    boletas = datos_esc.boletas.all()
+                    if boletas.exists():
+                        # Promediamos los valores reales que tengan las boletas
+                        promedios = [float(bo.promedio_boleta) for bo in boletas if bo.promedio_boleta]
+                        promedio_final = str(round(sum(promedios) / len(promedios), 2)) if promedios else "Sin calificaciones"
+                    else:
+                        promedio_final = "Sin calificaciones"
+
+                    datos_escolares_data = {
+                        "Promedio": promedio_final,
+                        "nivel": datos_esc.id_escolaridad.nivel_escolar if getattr(datos_esc, 'id_escolaridad', None) else None,
+                        "grado": datos_esc.id_escolaridad.grado_escolar if getattr(datos_esc, 'id_escolaridad', None) else None,
+                        "escuela": datos_esc.id_institucion.nombre if getattr(datos_esc, 'id_institucion', None) else "Sin escuela asignada"
+                    }
+
                 seg_data = {
                     "id_seguimiento": ultimo_seg.id_seguimiento,
                     "nota_seguimiento": ultimo_seg.nota_seguimiento,
                     "estatus": ultimo_seg.estatus,
                     "periodo": {
-                        "id_periodo": ultimo_seg.id_periodo.id_periodo,
-                        "ciclo_escolar": ultimo_seg.id_periodo.ciclo_escolar
-                    } if ultimo_seg.id_periodo else None,
-                    "datos_escolares": {
-                        "nivel": datos_esc.id_escolaridad.nivel_escolar if datos_esc and getattr(datos_esc, 'id_escolaridad', None) else None,
-                        "grado": datos_esc.id_escolaridad.grado_escolar if datos_esc and getattr(datos_esc, 'id_escolaridad', None) else None,
-                        "escuela": datos_esc.id_institucion.nombre if datos_esc and getattr(datos_esc, 'id_institucion', None) else None
-                    } if datos_esc else None
+                        "id_periodo": ultimo_seg.id_periodo.id_periodo if ultimo_seg.id_periodo else None,
+                        "ciclo_escolar": ultimo_seg.id_periodo.ciclo_escolar if ultimo_seg.id_periodo else None
+                    },
+                    "datos_escolares": datos_escolares_data
                 }
+
+            # --- 4. ARREGLAR ESTRUCTURA FINAL SOLICITADA ---
             data.append({
                 "id_beneficiario": b.id_beneficiario,
                 "estatus": b.estatus,
+                "fecha_ingreso": b.fecha_ingreso.strftime('%Y-%m-%d') if b.fecha_ingreso else None,
                 "expediente_resumen": {
-                    "nombre_completo": f"{exp.nombre} {exp.apellido_p} {exp.apellido_m or ''}".strip(),
-                    "fecha_nacimiento": exp.fecha_nacimiento,
-                    "telefono": exp.telefono,
-                    "municipio": municipio
+                    "nombre_completo": f"{exp.nombre} {exp.apellido_p} {exp.apellido_m or ''}".strip() if exp else "Sin expediente",
+                    "fecha_nacimiento": exp.fecha_nacimiento.strftime('%Y-%m-%d') if exp and exp.fecha_nacimiento else None,
+                    "telefono": exp.telefono if exp else None,
+                    "municipio": exp.id_direccion.id_geografia.municipio if exp and exp.id_direccion and getattr(exp.id_direccion, 'id_geografia', None) else "Sin municipio",
+                    "tutor": nombre_tutor,
+                    "telefonoTutor": telefono_tutor
                 },
+                # --- CORRECCIÓN AQUÍ: Cambiamos b.donadores.all() por b.padrinos.all() ---
+                "donadores": [
+                    {
+                        "id_donador": d.id_donador, 
+                        "nombre": f"{d.nombre} {d.apellido_paterno} {d.apellido_materno or ''}".strip()
+                    } 
+                    for d in b.padrinos.all()
+                ],
                 "ultimo_seguimiento": seg_data
             })
             
-        return Response(data)
+        return Response(data, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['post'], url_path='reinscripcion-masiva')
     @transaction.atomic
