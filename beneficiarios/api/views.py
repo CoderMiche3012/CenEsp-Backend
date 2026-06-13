@@ -326,7 +326,12 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
                     "datos_escolares": datos_escolares_data
                 }
 
-            # --- 4. ARREGLAR ESTRUCTURA FINAL SOLICITADA ---
+            # --- 4. ESTRUCTURA FINAL SOLICITADA ---
+            dir_obj = exp.id_direccion if exp else None
+
+            # Extraemos la geografía de forma segura por si la colonia vive ahí
+            geo_obj = getattr(dir_obj, 'id_geografia', None) if dir_obj else None
+
             data.append({
                 "id_beneficiario": b.id_beneficiario,
                 "estatus": b.estatus,
@@ -335,11 +340,18 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
                     "nombre_completo": f"{exp.nombre} {exp.apellido_p} {exp.apellido_m or ''}".strip() if exp else "Sin expediente",
                     "fecha_nacimiento": exp.fecha_nacimiento.strftime('%Y-%m-%d') if exp and exp.fecha_nacimiento else None,
                     "telefono": exp.telefono if exp else None,
-                    "municipio": exp.id_direccion.id_geografia.municipio if exp and exp.id_direccion and getattr(exp.id_direccion, 'id_geografia', None) else "Sin municipio",
+                    
+                    # CAMPOS DE DOMICILIO ULTRA-BLINDADOS CONTRA ATRIBUTOS INEXISTENTES:
+                    "calle": getattr(dir_obj, 'calle', "Sin asignar"),
+                    "numero": getattr(dir_obj, 'numero', "Sin asignar"),
+                    # Si 'colonia' no está en Dirección, intentamos buscarla en la tabla de Geografía
+                    "colonia": getattr(dir_obj, 'colonia', getattr(geo_obj, 'colonia', "Sin asignar")),
+                    "municipio": getattr(geo_obj, 'municipio', "Sin municipio"),
+                    "codigo_postal": getattr(dir_obj, 'codigo_postal', getattr(geo_obj, 'codigo_postal', "Sin asignar")),
+                    
                     "tutor": nombre_tutor,
                     "telefonoTutor": telefono_tutor
                 },
-                # --- CORRECCIÓN AQUÍ: Cambiamos b.donadores.all() por b.padrinos.all() ---
                 "donadores": [
                     {
                         "id_donador": d.id_donador, 
