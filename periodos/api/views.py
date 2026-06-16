@@ -42,8 +42,9 @@ def calcular_siguiente_escolaridad(escolaridad_actual):
     elif ('bachillerato' in nivel or 'preparatoria' in nivel or 'media superior' in nivel) and grado_num == 3:
         siguiente_grado = 1
         siguiente_nivel = 'Universidad'
-    elif 'universidad' in nivel:
-        # Si ya está en la universidad, no asumimos graduación automática, se mantiene constante
+    elif 'universidad' in nivel and grado_num >= 6:
+        # TOPE DE SEGURIDAD: Asumimos que la carrera dura máximo 5 años (o ajusta al número que manejen en el CEI).
+        # Si ya llegó al límite, ya no le subimos el grado para no crear "Universidad 6".
         return escolaridad_actual 
 
     # Buscamos la combinación en el catálogo oficial de Escolaridad
