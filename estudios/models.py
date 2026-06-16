@@ -19,7 +19,7 @@ class EstudioSocioeconomico(models.Model):
     nota_servicio = models.TextField(null=True, blank=True)
 
     id_documento = models.ForeignKey(
-        'beneficiarios.DocumentosPersonales', # Ajusta el nombre de la app si es diferente
+        'beneficiarios.DocumentosPersonales', 
         on_delete=models.SET_NULL, 
         null=True, 
         blank=True,

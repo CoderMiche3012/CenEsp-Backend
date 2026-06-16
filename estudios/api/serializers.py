@@ -16,7 +16,7 @@ class EstudioSocioeconomicoSerializer(serializers.ModelSerializer):
     analisis = AnalisisSerializer(read_only=True)
 
     def validate_nivel_escolar_inicial(self, value):
-        niveles_validos = ['Preescolar', 'Primaria', 'Secundaria', 'Media superior']
+        niveles_validos = ['Preescolar', 'Primaria', 'Secundaria', 'Media superior', 'Superior']
         if value not in niveles_validos:
             raise serializers.ValidationError(f"El nivel escolar debe ser uno de los siguientes: {', '.join(niveles_validos)}")
         return value
@@ -42,7 +42,6 @@ class FamiliaSerializer(serializers.ModelSerializer):
         required=False
     )
 
-    # 1. Agregamos los validadores de texto para nombres y apellidos (Punto 4 del documento)
     nombre = serializers.CharField(validators=[letras_regex])
     apellido_p = serializers.CharField(validators=[letras_regex])
     apellido_m = serializers.CharField(validators=[letras_regex], required=False, allow_blank=True, allow_null=True)
@@ -60,7 +59,6 @@ class FamiliaSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        # 1. Validación de Salario y Actividad
         actividad = data.get('actividad_principal', '').lower()
         salario = data.get('salario')
 
@@ -70,20 +68,17 @@ class FamiliaSerializer(serializers.ModelSerializer):
                     "salario": "Se requiere un salario si la actividad principal no es ser estudiante o labores del hogar."
                 })
         
-        # 2. Validación de Fecha de Nacimiento y Tutor Principal
         fecha_nacimiento = data.get('fecha_nacimiento')
         es_tutor = data.get('es_tutor_principal', False)
 
         if fecha_nacimiento:
             hoy = date.today()
             
-            # Validación explícita para fechas futuras (Punto 2 del documento)
             if fecha_nacimiento > hoy:
                 raise serializers.ValidationError({
                     "fecha_nacimiento": "La fecha de nacimiento no puede estar en el futuro."
                 })
 
-            # Fórmula exacta para calcular edad
             edad = hoy.year - fecha_nacimiento.year - ((hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
             
             if edad > 100:
@@ -91,7 +86,6 @@ class FamiliaSerializer(serializers.ModelSerializer):
                     "fecha_nacimiento": "La fecha de nacimiento no es lógica (edades entre 0 y 100 años)."
                 })
             
-            # Validación de tutor mayor de edad (Punto 3 del documento)
             if es_tutor and edad < 18:
                 raise serializers.ValidationError({
                     "fecha_nacimiento": "El tutor principal debe ser mayor de 18 años (mayor de edad)."
