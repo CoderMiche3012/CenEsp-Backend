@@ -123,13 +123,16 @@ class PeriodoViewSet(viewsets.ModelViewSet):
     
                             # Si cambia de nivel, para evitar mandar un 'None' que rompa la restricción de la BD,
                             # obtenemos o creamos de forma segura una institución comodín "Por Asignar".
+                            #CORREGI ESTO
                             if hubo_cambio_nivel:
-                                # Importamos el modelo de Institucion de forma local para evitar importes circulares
+                                # Importamos el modelo de Institucion de forma local
                                 from escolaridad.models import Institucion
+                                
+                                # Creamos o recuperamos la escuela usando SOLO el campo obligatorio
                                 inst_comodin, _ = Institucion.objects.get_or_create(
-                                    nombre="Por Asignar",
-                                    defaults={"ubicacion": "Centro CEI"} # O los campos obligatorios que tenga tu modelo
+                                    nombre="Por Asignar"
                                 )
+                                
                                 institucion_destino = inst_comodin
                                 grupo_destino = ""
                                 turno_destino = ""
@@ -139,7 +142,7 @@ class PeriodoViewSet(viewsets.ModelViewSet):
                                 grupo_destino = datos_viejos.grupo
                                 turno_destino = datos_viejos.turno
                                 especialidad_destino = datos_viejos.especialidad
-
+                            #-----
                             DatosEscolares.objects.create(
                                 grupo=grupo_destino,
                                 especialidad=especialidad_destino,
