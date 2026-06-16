@@ -118,18 +118,31 @@ class PeriodoViewSet(viewsets.ModelViewSet):
                             # Calculamos grado y nivel nuevos
                             nueva_escolaridad = calcular_siguiente_escolaridad(datos_viejos.id_escolaridad)
 
-                            # REGLA DE NEGOCIO: Si cambió el nivel educativo, la institución DEBE quedar vacía (None)
-                            # para obligar a Dalia a ingresar la nueva escuela de nivel superior.
+                            # Verificamos si cambió el nivel educativo 
                             hubo_cambio_nivel = (datos_viejos.id_escolaridad.nivel_escolar.lower() != nueva_escolaridad.nivel_escolar.lower())
-                            institucion_destino = None if hubo_cambio_nivel else datos_viejos.id_institucion
-                            
-                            # Si cambia de nivel, limpiamos grupo y turno; si es avance regular, los conservamos.
-                            grupo_destino = "" if hubo_cambio_nivel else datos_viejos.grupo
-                            turno_destino = "" if hubo_cambio_nivel else datos_viejos.turno
+    
+                            # Si cambia de nivel, para evitar mandar un 'None' que rompa la restricción de la BD,
+                            # obtenemos o creamos de forma segura una institución comodín "Por Asignar".
+                            if hubo_cambio_nivel:
+                                # Importamos el modelo de Institucion de forma local para evitar importes circulares
+                                from escolaridad.models import Institucion
+                                inst_comodin, _ = Institucion.objects.get_or_create(
+                                    nombre="Por Asignar",
+                                    defaults={"ubicacion": "Centro CEI"} # O los campos obligatorios que tenga tu modelo
+                                )
+                                institucion_destino = inst_comodin
+                                grupo_destino = ""
+                                turno_destino = ""
+                                especialidad_destino = ""
+                            else:
+                                institucion_destino = datos_viejos.id_institucion
+                                grupo_destino = datos_viejos.grupo
+                                turno_destino = datos_viejos.turno
+                                especialidad_destino = datos_viejos.especialidad
 
                             DatosEscolares.objects.create(
                                 grupo=grupo_destino,
-                                especialidad=datos_viejos.especialidad if not hubo_cambio_nivel else "",
+                                especialidad=especialidad_destino,
                                 turno=turno_destino,
                                 nota_escolar=datos_viejos.nota_escolar,
                                 modalidad_educativa=datos_viejos.modalidad_educativa,
@@ -146,7 +159,7 @@ class PeriodoViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             logger.error(f"Error interno en migración: {str(e)}")
-            return Response({"error": "Error interno del servidor"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": f"Error interno del servidor: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     # ruta: /api/periodos/activo/
     @action(detail=False, methods=['get'], url_path='activo')
