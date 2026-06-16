@@ -174,7 +174,6 @@ class Fotografias(models.Model):
         ('Graduación', 'Graduación'),
         ('General', 'General')
     ]
-
     id_foto = models.AutoField(primary_key=True)
     foto_archivo = models.ImageField(upload_to='evidencias_fotos/%Y/%m/', max_length=500, null=True, blank=True) 
     descripcion = models.CharField(max_length=255, blank=True, null=True)

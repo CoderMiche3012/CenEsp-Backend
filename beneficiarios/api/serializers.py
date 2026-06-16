@@ -32,6 +32,7 @@ class DireccionSerializer(serializers.ModelSerializer):
         model = Direccion
         fields = ['id_direccion', 'calle', 'numero', 'localidad', 'pais', 'id_geografia', 'geografia_detalle']
 
+
 class FotografiasSerializer(serializers.ModelSerializer):
     etapa = serializers.CharField(
         max_length=50,
@@ -50,19 +51,27 @@ class FotografiasSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate_foto_archivo(self, value):
-  
         if not value:
             return value
             
-        # Límite de 10MB para fotos
-        limite_tamano = 20 * 1024 * 1024 
+        # 1. Validación de Formato de Imagen (.png, .jpg, .jpeg)
+        extension = os.path.splitext(value.name)[1].lower()
+        formatos_permitidos = ['.png', '.jpg', '.jpeg']
         
+        if extension not in formatos_permitidos:
+            raise serializers.ValidationError(
+                f"Formato de imagen no válido. Solo se admiten archivos: {', '.join(formatos_permitidos)}"
+            )
+            
+        # 2. Validación de Peso Máximo (20 MB)
+        limite_tamano = 20 * 1024 * 1024 
         if value.size > limite_tamano:
             raise serializers.ValidationError(
-                "La fotografía es demasiado pesada. El tamaño máximo permitido es de 10MB."
+                "La fotografía es demasiado pesada. El tamaño máximo permitido es de 20MB."
             )
             
         return value
+
 
 class DocumentosPersonalesSerializer(serializers.ModelSerializer):
     nombre_documento = serializers.CharField(
@@ -79,21 +88,24 @@ class DocumentosPersonalesSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate_archivo(self, value):
-        """
-        Validación del archivo físico.
-        """
+        if not value:
+            return value
+
+        # 1. Validación de Formato de Documento (.pdf, .docx, .xls, .xlsx)
         extension = os.path.splitext(value.name)[1].lower()
-        formatos_permitidos = ['.pdf', '.docx', '.jpg', '.jpeg', '.png']
+        # Nota: Agregué .xlsx por si suben versiones modernas de Excel para que no les rebote
+        formatos_permitidos = ['.pdf', '.docx', '.xls', '.xlsx']
         
         if extension not in formatos_permitidos:
             raise serializers.ValidationError(
-                "Formato no válido. Solo PDF, Word (.docx) o imágenes (JPG, PNG)."
+                "Formato de documento no válido. Solo se admiten archivos PDF, Word (.docx) o Excel (.xls, .xlsx)."
             )
             
-        limite_tamano = 5 * 1024 * 1024  # 5MB
+        # 2. Validación de Peso Máximo (10 MB)
+        limite_tamano = 10 * 1024 * 1024  # 10MB
         if value.size > limite_tamano:
             raise serializers.ValidationError(
-                "El archivo supera los 5MB permitidos."
+                "El archivo supera el tamaño máximo permitido de 10MB."
             )
             
         return value
