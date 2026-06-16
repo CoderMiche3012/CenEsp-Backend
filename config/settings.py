@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'estudios',
     'donadores',
     'escolaridad',
+    'modeloML',
 ]
 
 MIDDLEWARE = [

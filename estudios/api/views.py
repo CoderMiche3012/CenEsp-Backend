@@ -1,6 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from estudios.models import EstudioSocioeconomico, Familia, Analisis, Gasto
+from estudios.models import EstudioSocioeconomico, Familia, Gasto
+from modeloML.models import Analisis
 from .serializers import EstudioSocioeconomicoSerializer, FamiliaSerializer, AnalisisSerializer, GastoSerializer
 
 class EstudioSocioeconomicoViewSet(viewsets.ModelViewSet):

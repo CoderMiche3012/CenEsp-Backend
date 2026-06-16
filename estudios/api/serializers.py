@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.core.validators import RegexValidator
-from estudios.models import EstudioSocioeconomico, Familia, Analisis, Gasto
+from estudios.models import EstudioSocioeconomico, Familia, Gasto
+from modeloML.models import Analisis
 from beneficiarios.models import Expediente
 from datetime import date
 

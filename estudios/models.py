@@ -30,6 +30,7 @@ class EstudioSocioeconomico(models.Model):
     class Meta:
         db_table = 'estudio_socioeconomico'
 
+"""
 class Analisis(models.Model):
     id_analisis = models.AutoField(primary_key=True)
     prioridad = models.CharField(max_length=50)
@@ -38,6 +39,8 @@ class Analisis(models.Model):
     class Meta:
         db_table = 'analisis'
 
+
+"""
 class Gasto(models.Model):
     id_gasto = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100)
