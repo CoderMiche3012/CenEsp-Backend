@@ -10,6 +10,12 @@ from periodos.models import Periodo
 from estudios.models import EstudioSocioeconomico
 from escolaridad.models import Escolaridad, DatosEscolares
 from periodos.models import Periodo
+import json
+import os
+from django.conf import settings
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from beneficiarios.models import (Direccion, Expediente, Postulante, Visita_Postulante, 
                                   Beneficiario, Fotografias, SeguimientoBeneficiario, 
                                   ApoyoEconomico, UsoServicios, Obligacion, 
@@ -108,6 +114,42 @@ class PaisesCatalogoView(APIView):
         
         
         return Response(list(paises_unicos))
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def buscar_direccion_por_cp(request, cp):
+
+    ruta_archivo = os.path.join(settings.BASE_DIR, 'beneficiarios', 'data', 'sepomex_oaxaca.json')
+    
+    try:
+        with open(ruta_archivo, 'r', encoding='utf-8') as f:
+            registros = json.load(f)
+            
+        # 1. Filtramos todos los objetos que tengan el CP solicitado
+        coincidencias = [r for r in registros if str(r.get("codigo_postal")) == str(cp)]
+        
+        if coincidencias:
+            # 2. Como el estado, municipio y país son iguales para el mismo CP, 
+            # tomamos los datos base del primer registro que encontramos.
+            primer_registro = coincidencias[0]
+            
+            # 3. Extraemos y agrupamos todas las colonias que comparten ese mismo CP
+            lista_colonias = [c.get("colonia") for c in coincidencias if c.get("colonia")]
+            
+            # 4. Le devolvemos a Dalia la respuesta idéntica y limpia
+            return Response({
+                "codigo_postal": cp,
+                "pais": primer_registro.get("pais", "MX"),
+                "estado": primer_registro.get("estado", "Oaxaca"),
+                "municipio": primer_registro.get("municipio", ""),
+                "colonias": lista_colonias  # Esto le da el array para su select en React
+            })
+        else:
+            return Response({"error": "Código Postal no encontrado en el catálogo de Oaxaca."}, status=404)
+            
+    except FileNotFoundError:
+        return Response({"error": "Archivo sepomex_oaxaca.json no encontrado en el servidor."}, status=500)
 
 class ExpedienteViewSet(viewsets.ModelViewSet):
     queryset = Expediente.objects.all()

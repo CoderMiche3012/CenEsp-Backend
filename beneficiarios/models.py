@@ -4,7 +4,6 @@ from django.core.validators import MinValueValidator, RegexValidator
 from decimal import Decimal
 from periodos.models import Periodo
 
-# --- VALIDADORES GLOBALES ---
 telefono_validador = RegexValidator(regex=r'^\d{10}$', message='El teléfono debe tener exactamente 10 dígitos.')
 cp_validador = RegexValidator(regex=r'^\d{5}$', message='El código postal debe tener exactamente 5 dígitos.')
 

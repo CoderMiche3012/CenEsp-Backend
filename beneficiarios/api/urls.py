@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DireccionViewSet, ExpedienteViewSet, PostulanteViewSet, VisitaPostulanteViewSet, BeneficiarioViewSet, FotografiasViewSet, SeguimientoBeneficiarioViewSet, ApoyoEconomicoViewSet, UsoServiciosViewSet, ObligacionViewSet, DocumentosPersonalesViewSet, GeografiaViewSet, PaisesCatalogoView,ReporteAsistenciasView
+from .views import DireccionViewSet, ExpedienteViewSet, PostulanteViewSet, VisitaPostulanteViewSet, BeneficiarioViewSet, FotografiasViewSet, SeguimientoBeneficiarioViewSet, ApoyoEconomicoViewSet, UsoServiciosViewSet, ObligacionViewSet, DocumentosPersonalesViewSet, GeografiaViewSet, PaisesCatalogoView,ReporteAsistenciasView, buscar_direccion_por_cp
 
 router = DefaultRouter()
 router.register(r'direcciones', DireccionViewSet, basename='direcciones')
@@ -21,4 +21,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('catalogos/paises/', PaisesCatalogoView.as_view(), name='catalogo-paises'),
     path('asistencias/', ReporteAsistenciasView.as_view(), name='reporte-asistencias'),
+    path('catalogos/codigo-postal/<str:cp>/', buscar_direccion_por_cp, name='buscar_cp'),
 ]
