@@ -54,7 +54,6 @@ class FotografiasSerializer(serializers.ModelSerializer):
         if not value:
             return value
             
-        # 1. Validación de Formato de Imagen (.png, .jpg, .jpeg)
         extension = os.path.splitext(value.name)[1].lower()
         formatos_permitidos = ['.png', '.jpg', '.jpeg']
         
@@ -63,8 +62,7 @@ class FotografiasSerializer(serializers.ModelSerializer):
                 f"Formato de imagen no válido. Solo se admiten archivos: {', '.join(formatos_permitidos)}"
             )
             
-        # 2. Validación de Peso Máximo (20 MB)
-        limite_tamano = 20 * 1024 * 1024 
+        limite_tamano = 20 * 1024 * 1024 #20MB
         if value.size > limite_tamano:
             raise serializers.ValidationError(
                 "La fotografía es demasiado pesada. El tamaño máximo permitido es de 20MB."
@@ -91,9 +89,7 @@ class DocumentosPersonalesSerializer(serializers.ModelSerializer):
         if not value:
             return value
 
-        # 1. Validación de Formato de Documento (.pdf, .docx, .xls, .xlsx)
         extension = os.path.splitext(value.name)[1].lower()
-        # Nota: Agregué .xlsx por si suben versiones modernas de Excel para que no les rebote
         formatos_permitidos = ['.pdf', '.docx', '.xls', '.xlsx']
         
         if extension not in formatos_permitidos:
@@ -101,8 +97,7 @@ class DocumentosPersonalesSerializer(serializers.ModelSerializer):
                 "Formato de documento no válido. Solo se admiten archivos PDF, Word (.docx) o Excel (.xls, .xlsx)."
             )
             
-        # 2. Validación de Peso Máximo (10 MB)
-        limite_tamano = 10 * 1024 * 1024  # 10MB
+        limite_tamano = 10 * 1024 * 1024  #10MB
         if value.size > limite_tamano:
             raise serializers.ValidationError(
                 "El archivo supera el tamaño máximo permitido de 10MB."

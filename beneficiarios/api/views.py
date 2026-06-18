@@ -316,23 +316,19 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
         for b in beneficiarios:
             exp = b.id_expediente
             
-            # --- 1. EXTRAER EL TUTOR PRINCIPAL Y SU TELÉFONO ---
             nombre_tutor = "Sin asignar"
             telefono_tutor = None
             
             if exp:
-                # Buscamos en la tabla familia el que esté marcado como tutor principal
                 tutor_obj = exp.familiares.filter(es_tutor_principal=True).first()
                 if tutor_obj:
                     nombre_tutor = f"{tutor_obj.nombre} {tutor_obj.apellido_p} {tutor_obj.apellido_m or ''}".strip()
                     telefono_tutor = tutor_obj.telefono
 
-            # --- 2. SACAR EL ÚLTIMO SEGUIMIENTO Y SUS DATOS ESCOLARES ---
             ultimo_seg = b.seguimientos.order_by('-id_seguimiento').first()
             seg_data = None
             
             if ultimo_seg:
-                # Intento seguro de obtener los datos escolares (relación Uno a Uno)
                 try:
                     datos_esc = ultimo_seg.datos_escolares
                 except Exception:
@@ -340,11 +336,8 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
                 
                 datos_escolares_data = None
                 if datos_esc:
-                    # --- 3. CALCULAR EL PROMEDIO DESDE LAS BOLETAS ---
-                    # Buscamos todas las boletas asociadas a este registro escolar
                     boletas = datos_esc.boletas.all()
                     if boletas.exists():
-                        # Promediamos los valores reales que tengan las boletas
                         promedios = [float(bo.promedio_boleta) for bo in boletas if bo.promedio_boleta]
                         promedio_final = str(round(sum(promedios) / len(promedios), 2)) if promedios else "Sin calificaciones"
                     else:
@@ -368,10 +361,8 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
                     "datos_escolares": datos_escolares_data
                 }
 
-            # --- 4. ESTRUCTURA FINAL SOLICITADA ---
             dir_obj = exp.id_direccion if exp else None
 
-            # Extraemos la geografía de forma segura por si la colonia vive ahí
             geo_obj = getattr(dir_obj, 'id_geografia', None) if dir_obj else None
 
             data.append({
@@ -449,7 +440,6 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
                 nuevo_grado = grado_actual
                 nuevo_nivel = escolaridad_vieja.nivel_escolar
 
-                # 🧠 EL CEREBRO DE LA PROMOCIÓN (Ajusta los textos según tu catálogo exacto)
                 if nivel_actual == 'preescolar':
                     if grado_actual in ['1', '1ero']: nuevo_grado = '2'
                     elif grado_actual in ['2', '2do']: nuevo_grado = '3'
@@ -472,14 +462,11 @@ class BeneficiarioViewSet(viewsets.ModelViewSet):
                         nuevo_grado = '1'
                         nuevo_nivel = 'Bachillerato'
 
-                # 4. Buscamos la nueva escolaridad en el catálogo (ej: "1" de "Secundaria")
-                # Si no existe en el catálogo, la creamos silenciosamente
                 nueva_escolaridad, _ = Escolaridad.objects.get_or_create(
                     grado_escolar=nuevo_grado,
                     nivel_escolar=nuevo_nivel
                 )
 
-                # 5. Creamos los Datos Escolares nuevos dejando la escuela en blanco
                 DatosEscolares.objects.create(
                     id_seguimiento=nuevo_seguimiento,
                     id_escolaridad=nueva_escolaridad,
