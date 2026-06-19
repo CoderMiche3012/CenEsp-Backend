@@ -2,79 +2,113 @@ from django.core.management.base import BaseCommand
 from cuentas.models import Rol, Permiso
 
 class Command(BaseCommand):
-    help = 'Crea los roles y permisos con nomenclatura de punto (usuarios.ver)'
+    help = 'Crea los roles y asigna permisos granulares según el documento oficial de reglas'
 
     def handle(self, *args, **kwargs):
-        self.stdout.write("Iniciando la configuración de roles y permisos del CEI...")
+        self.stdout.write("Iniciando la configuración granular de roles y permisos del CEI...")
 
         modulos = [
             'usuarios', 'roles', 'periodos', 'postulantes', 'familia', 
-            'expedientes', 'estudios', 'visitas', 'beneficiarios', 'seguimientos', 
-            'datos_escolares', 'donadores', 'donativos', 'apoyos', 'servicios', 
-            'obligaciones', 'reportes', 'direcciones'
+            'beneficiarios', 'seguimientos', 'datos_escolares', 'donadores', 
+            'donativos', 'apoyos', 'servicios', 'obligaciones', 'reportes', 
+            'direcciones', 'fotografias', 'documentos'
         ]
         acciones_crud = ['ver', 'crear', 'editar', 'eliminar']
 
         permisos_creados = {}
-        #generara los permisos dinamicos
+        
         for modulo in modulos:
             for accion in acciones_crud:
                 nombre = f"{modulo}.{accion}"
-                permiso, created = Permiso.objects.get_or_create(
+                permiso, _ = Permiso.objects.get_or_create(
                     nombre_permiso=nombre,
                     defaults={'descripcion': f'Permite {accion} en el módulo {modulo}'}
                 )
                 permisos_creados[nombre] = permiso
 
-        #genera permisos especiales
         especiales = [
-            ('periodos.migrar', 'Operación crítica: Migración masiva de periodos'),
             ('postulantes.aceptar', 'Convertir postulante a beneficiario'),
             ('postulantes.rechazar', 'Rechazar postulante'),
             ('reportes.exportar', 'Exportar reportes a Excel/PDF')
         ]
         for nombre, desc in especiales:
-            permiso, created = Permiso.objects.get_or_create(
+            permiso, _ = Permiso.objects.get_or_create(
                 nombre_permiso=nombre, defaults={'descripcion': desc}
             )
             permisos_creados[nombre] = permiso
 
-        self.stdout.write(self.style.SUCCESS(f'Se generaron {len(permisos_creados)} permisos en total.'))
+        modulos_operativos = [m for m in modulos if m not in ['usuarios', 'roles']]
+        permisos_ver_todos = [f"{m}.ver" for m in modulos_operativos]
 
-        #definicion de los roles
-        roles_data = [
-            {'nombre': 'Administrador', 'desc': 'Acceso total al sistema'},
-            {'nombre': 'Coordinacion', 'desc': 'Gestión general (POST, GET, PATCH)'},
-            {'nombre': 'Asistencia', 'desc': 'Trabajo social y seguimiento (POST, GET, PATCH)'},
-            {'nombre': 'Servicio Social', 'desc': 'Apoyo operativo (POST, GET, PATCH)'},
-            {'nombre': 'Contaduria', 'desc': 'Auditoría financiera (GET Consultas)'},
-            {'nombre': 'Mesa Directiva', 'desc': 'Auditoría general (GET Consultas)'},
-            {'nombre': 'Voluntarios', 'desc': 'Apoyo limitado (GET, POST, PATCH)'},
-        ]
+        matriz_permisos = {
+            'Coordinacion': permisos_ver_todos + [
+                'donadores.crear', 'donadores.editar',
+                'donativos.crear', 'donativos.editar',
+                'beneficiarios.crear', 'beneficiarios.editar',
+                'seguimientos.crear', 'seguimientos.editar',
+                'familia.crear', 'familia.editar',
+                'documentos.crear', 'documentos.editar', 'documentos.eliminar',
+                'apoyos.crear', 'apoyos.editar',
+                'servicios.crear', 'servicios.editar',
+                'datos_escolares.crear', 'datos_escolares.editar',
+                'reportes.exportar'
+            ],
+            'Asistencia': permisos_ver_todos + [
+                'donadores.crear', 'donadores.editar',
+                'donativos.crear', 'donativos.editar',
+                'beneficiarios.crear', 'beneficiarios.editar',
+                'familia.crear',
+                'obligaciones.crear', 'obligaciones.editar',
+                'fotografias.crear', 'fotografias.editar', 'fotografias.eliminar',
+                'documentos.crear', 'documentos.editar', 'documentos.eliminar',
+                'apoyos.crear',
+                'servicios.crear', 'servicios.editar',
+                'datos_escolares.crear', 'datos_escolares.editar',
+                'reportes.exportar'
+            ],
+            'Servicio Social': permisos_ver_todos + [
+                'postulantes.crear', 'postulantes.editar', 'postulantes.aceptar', 'postulantes.rechazar',
+                'familia.crear',
+                'obligaciones.crear', 'obligaciones.editar',
+                'fotografias.crear', 'fotografias.editar', 'fotografias.eliminar',
+                'documentos.crear', 'documentos.editar', 'documentos.eliminar',
+                'apoyos.crear', 'apoyos.editar',
+                'reportes.exportar'
+            ],
+            'Voluntarios': permisos_ver_todos + [
+                'donadores.crear',
+                'donativos.crear',
+                'postulantes.crear',
+                'beneficiarios.crear',
+                'familia.crear',
+                'documentos.crear',
+                'datos_escolares.crear'
+            ],
+            'Contaduria': permisos_ver_todos + ['reportes.exportar'],
+            'Mesa Directiva': permisos_ver_todos + ['reportes.exportar']
+        }
 
-        for rol_data in roles_data:
-            rol, created = Rol.objects.get_or_create(
-                nombre_rol=rol_data['nombre'],
-                defaults={'descripcion': rol_data['desc']}
-            )
+        roles_desc = {
+            'Administrador': 'Acceso total al sistema',
+            'Coordinacion': 'Gestión general y aprobaciones',
+            'Asistencia': 'Trabajo social y seguimiento',
+            'Servicio Social': 'Gestión de postulantes y apoyo operativo',
+            'Contaduria': 'Auditoría financiera',
+            'Mesa Directiva': 'Auditoría general',
+            'Voluntarios': 'Apoyo limitado (Ingreso de datos)'
+        }
 
-            if rol.nombre_rol == 'Administrador':
+        for nombre_rol, desc in roles_desc.items():
+            rol, _ = Rol.objects.get_or_create(nombre_rol=nombre_rol, defaults={'descripcion': desc})
+            
+            if nombre_rol == 'Administrador':
                 rol.permisos.set(permisos_creados.values())
+            else:
+                nombres_permisos = matriz_permisos.get(nombre_rol, [])
+                objetos_permisos = [permisos_creados[p] for p in nombres_permisos if p in permisos_creados]
 
-            elif rol.nombre_rol in ['Mesa Directiva', 'Contaduria']:
-                permisos_lectura = [p for nombre, p in permisos_creados.items() if nombre.endswith('.ver')]
-                rol.permisos.set(permisos_lectura)
+                rol.permisos.set(objetos_permisos)
 
-            elif rol.nombre_rol in ['Coordinacion', 'Asistencia', 'Servicio Social', 'Voluntarios']:
-                permisos_operativos = [
-                    p for nombre, p in permisos_creados.items() 
-                    if not nombre.endswith('.eliminar') 
-                    and not nombre.startswith('roles') 
-                    and not nombre.startswith('permisos')
-                    and nombre != 'periodos.migrar' #solo el admin podra migrar cambios a la base de datos
-                ]
-                rol.permisos.set(permisos_operativos)
+            self.stdout.write(self.style.SUCCESS(f'Rol configurado exitosamente: {rol.nombre_rol}'))
 
-            self.stdout.write(self.style.SUCCESS(f'Rol configurado: {rol.nombre_rol}'))
-
-        self.stdout.write(self.style.SUCCESS('¡Configuración de BD completada con éxito!'))
+        self.stdout.write(self.style.SUCCESS('¡Configuración completada con éxito!'))

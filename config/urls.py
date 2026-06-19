@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/estudios/', include('estudios.api.urls')),
     path('api/donadores/', include('donadores.api.urls')),
     path('api/escolaridad/', include('escolaridad.api.urls')),
+    path('api/modeloML/', include('modeloML.api.urls')),
 ]
 
 #trabajar archivos de imagen
