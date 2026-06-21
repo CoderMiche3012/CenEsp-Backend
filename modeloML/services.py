@@ -19,26 +19,22 @@ def extraer_caracteristicas_socioeconomicas(estudio_id):
                 if salario_limpio:
                     ingreso_total += float(salario_limpio)
         
-        # Cálculo de personas dependientes
+        #personas dependientes
         num_dependientes = familiares.count()
         if num_dependientes == 0:
-            num_dependientes = 1 # Evitamos división entre cero
+            num_dependientes = 1 
             
-        # Ingreso Per Cápita
+        #Ingresos per capita
         ingreso_per_capita = ingreso_total / num_dependientes
 
         gastos_agregados = Gasto.objects.filter(id_estudiosocioeconomico=estudio).aggregate(total=Sum('monto'))
         gastos_totales = float(gastos_agregados['total'] or 0.0)
-
         proporcion_gasto = gastos_totales / ingreso_total if ingreso_total > 0 else 1.0
-        
         tutor_principal = familiares.filter(es_tutor_principal=True).first()
         es_monoparental = 1.0 if tutor_principal else 0.0
 
-        # 1. El vector matemático que necesita Scikit-Learn
         features = [ingreso_per_capita, proporcion_gasto, float(num_dependientes), es_monoparental]
         
-        # 2. Los datos crudos que necesitamos para armar la justificación en texto
         datos_crudos = {
             "ingreso_total": ingreso_total,
             "gastos_totales": gastos_totales,
@@ -46,18 +42,15 @@ def extraer_caracteristicas_socioeconomicas(estudio_id):
             "ingreso_per_capita": ingreso_per_capita
         }
 
-        # Retornamos ambos
         return features, datos_crudos
 
     except EstudioSocioeconomico.DoesNotExist:
-        # Valores por defecto en caso de error
         return [0.0, 1.0, 1.0, 0.0], {"ingreso_total": 0, "gastos_totales": 0, "num_dependientes": 1, "ingreso_per_capita": 0}
 
 
 def evaluar_y_guardar_prioridad_ia(estudio_id):
     from modeloML.models import Analisis  
     try:
-        # 1. Recibimos tanto el vector como los datos crudos
         features, datos_crudos = extraer_caracteristicas_socioeconomicas(estudio_id)
         
         ruta_modelo = os.path.join(settings.BASE_DIR, 'modeloML', 'modelos_preentrenados', 'clasificador_coneval.joblib')
@@ -70,7 +63,6 @@ def evaluar_y_guardar_prioridad_ia(estudio_id):
             mapeo_prioridad = {0: "Baja", 1: "Media", 2: "Alta"}
             prioridad_resultante = mapeo_prioridad.get(prediccion_indice, "Alta")
         
-        # 2. Generamos la justificación dinámica (XAI) con los datos reales
         ing_pc = datos_crudos["ingreso_per_capita"]
         ing_tot = datos_crudos["ingreso_total"]
         deps = datos_crudos["num_dependientes"]
@@ -83,7 +75,6 @@ def evaluar_y_guardar_prioridad_ia(estudio_id):
         else:
             justificacion = f"El modelo determinó una prioridad BAJA. El ingreso per cápita de ${ing_pc:.2f} MXN supera el umbral de riesgo crítico. El núcleo de {deps} personas presenta mayor estabilidad económica (Ingresos: ${ing_tot:.2f} MXN)."
 
-        # 3. Guardamos en la base de datos (PostgreSQL)
         estudio = EstudioSocioeconomico.objects.get(id_estudio=estudio_id)
         estudio.prioridad_servicio = prioridad_resultante
         estudio.save()
@@ -96,7 +87,6 @@ def evaluar_y_guardar_prioridad_ia(estudio_id):
             analisis_obj.prioridad = prioridad_resultante
             analisis_obj.save()
             
-        # 4. Retornamos el diccionario completo para que la Vista (API) se lo mande a Dalia
         return {
             "prioridad": prioridad_resultante,
             "justificacion": justificacion,
