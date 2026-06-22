@@ -282,7 +282,6 @@ class UsoServicios(models.Model):
     fecha_realizacion = models.DateField()
     asistencia = models.BooleanField(default=False) 
     tipo_servicio = models.CharField(max_length=100) 
-    # Se bloquean los números negativos para acompañantes
     numero_acompanantes = models.IntegerField(
         default=0, 
         blank=True,

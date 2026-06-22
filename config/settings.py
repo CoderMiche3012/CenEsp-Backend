@@ -38,7 +38,9 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary_storage',
     'django.contrib.staticfiles',
+    'cloudinary',
     #librerias de cors para react 
     'corsheaders',
     #librerias añadidas 
@@ -171,3 +173,23 @@ CORS_ALLOWED_ORIGINS = [
 
 #permite que React envíe cookies o tokens especiales si los necesita
 CORS_ALLOW_CREDENTIALS = True
+
+import os
+
+# 1. Configuración moderna de Django (Versiones 4.2+)
+STORAGES = {
+    "default": {
+        # Usamos RawMedia para que acepte PDFs y DOCX sin problemas
+        "BACKEND": "cloudinary_storage.storage.RawMediaCloudinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# 2. Tus credenciales se quedan igual
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+}
