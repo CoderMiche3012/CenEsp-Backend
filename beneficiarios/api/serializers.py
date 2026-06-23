@@ -175,6 +175,36 @@ class PostulanteSerializer(serializers.ModelSerializer):
         model = Postulante
         fields = ['id_postulante', 'estatus', 'id_usuario', 'registrado_por', 'id_expediente']
 
+    def update(self, instance, validated_data):
+        request = self.context.get('request')
+        
+        if request and request.data:
+            data = request.data
+            
+            # 🕵️‍♂️ EL CHIVATO: Esto imprimirá en tu terminal de Docker lo que llega de React
+            print("🛑 DATOS CRUDOS RECIBIDOS EN BACKEND:", data)
+            
+            if 'estatus' in data:
+                instance.estatus = data['estatus']
+                instance.save()
+            
+            estudio_data = data.get('estudio', {})
+            if estudio_data:
+                estudio = EstudioSocioeconomico.objects.filter(id_expediente=instance.id_expediente).first()
+                if estudio:
+                    # Tolerancia: Buscamos ambas posibles llaves que React podría enviar
+                    nueva_prioridad = estudio_data.get('prioridad_servicio') or estudio_data.get('prioridad')
+                    
+                    if nueva_prioridad:
+                        estudio.prioridad_servicio = nueva_prioridad
+                        
+                    if 'nota_servicio' in estudio_data:
+                        estudio.nota_servicio = estudio_data['nota_servicio']
+                    
+                    estudio.save()
+                    
+        return instance
+
     def get_registrado_por(self, obj):
         if obj.id_usuario:
             return f"{obj.id_usuario.nombre} {obj.id_usuario.apellido_p}".strip()
@@ -253,6 +283,8 @@ class PostulanteSerializer(serializers.ModelSerializer):
             }
 
         return response
+    
+    
 
 class VisitaPostulanteSerializer(serializers.ModelSerializer):
     class Meta:

@@ -6,8 +6,10 @@ from modeloML.services import evaluar_y_guardar_prioridad_ia
 @receiver(post_save, sender=EstudioSocioeconomico)
 def disparar_evaluacion_ia(sender, instance, created, **kwargs):
     """
-    Cada vez que Dalia cree o actualice un Estudio Socioeconómico,
-    esta señal se ejecutará en segundo plano e invocará al clasificador de IA.
+    Esta señal se ejecutará en segundo plano e invocará al clasificador de IA
+    SOLO cuando el estudio se crea por primera vez, respetando las ediciones manuales.
     """
-    # Ejecutamos la inferencia de Machine Learning usando el ID del estudio recién guardado
-    evaluar_y_guardar_prioridad_ia(instance.id_estudio)
+    # Si el registro es completamente nuevo, la IA hace su primera evaluación
+    if created:
+        evaluar_y_guardar_prioridad_ia(instance.id_estudio)
+        
